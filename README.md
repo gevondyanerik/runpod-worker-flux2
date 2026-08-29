@@ -182,6 +182,11 @@ One RTX PRO 4500 Blackwell (32 GB), ComfyUI v0.34.0, torch 2.11.0+cu128,
 2026-08-29. Inference only, excluding encode and upload. Numbers from one
 card on one day — treat them as ratios, not guarantees.
 
+Resolution is ±0.5 s: the worker polls `/history` on a 500 ms interval, so
+every timing here is quantised to that. The differences below are several
+times larger than the resolution, but a difference of half a second would not
+be measurable by this method.
+
 | | 1024² t2i | edit, 1 ref | edit, 2 refs | VRAM in use |
 |---|---|---|---|---|
 | `klein-4b` (4 steps) | 2.0 s | 3.5 s | 5.0 s | 12.8 GB |
