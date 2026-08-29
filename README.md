@@ -374,7 +374,8 @@ their step counts would suggest.
 ### Sampling steps
 
 `DEFAULT_STEPS` sets the step count for requests that do not carry their own.
-Leave it empty and each profile uses its own default — 4 for the distilled
+Leave it empty — or at `0`, which is what the Hub's stepper submits when you do
+not touch it — and each profile uses its own default: 4 for the distilled
 models, 28 for the base ones. A request that sends `steps` overrides it either
 way, so this is the endpoint's house default, not a ceiling.
 
@@ -405,7 +406,7 @@ model, not a preference, so it stays out of endpoint configuration.
 | `FLUX2_TEXT_ENCODER` | `bf16` | `bf16` (8.0 GB, baked in) or `fp4` (3.8 GB) |
 | `MODEL_SOURCE` | `auto` | `auto`, `baked`, `volume` or `download` |
 | `DEFAULT_WIDTH` / `DEFAULT_HEIGHT` | 1024 | Used when a request omits them |
-| `DEFAULT_STEPS` | *the profile's* | Sampling steps when a request omits them |
+| `DEFAULT_STEPS` | *the profile's* | Sampling steps when a request omits them; `0` or empty follows the profile |
 | `MAX_PIXELS` | 4194304 | Ceiling on width × height |
 | `MAX_IMAGES_PER_REQUEST` | 4 | Upper bound on `n` |
 | `MAX_INPUT_IMAGES` | 6 | Can lower the profile's limit, never raise it |

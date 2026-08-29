@@ -166,14 +166,10 @@ def test_default_steps_overrides_the_profile(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_default_steps_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DEFAULT_STEPS", "0")
+    monkeypatch.setenv("DEFAULT_STEPS", str(constants.MAX_STEPS + 1))
     with pytest.raises(WorkerError) as excinfo:
         config_module.load()
     assert excinfo.value.code is ErrorCode.INVALID_INPUT
-
-    monkeypatch.setenv("DEFAULT_STEPS", str(constants.MAX_STEPS + 1))
-    with pytest.raises(WorkerError):
-        config_module.load()
 
 
 def test_blank_default_steps_means_unset(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -182,6 +178,26 @@ def test_blank_default_steps_means_unset(monkeypatch: pytest.MonkeyPatch) -> Non
     config = config_module.load()
     assert config.default_steps is None
     assert config.effective_steps == config.variant.sampling.steps
+
+
+def test_zero_default_steps_means_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The Hub renders a number input as a stepper with no empty state: it shows
+    # 0 and submits it, so a deploy that touched nothing arrives as "0" and must
+    # not be rejected.
+    monkeypatch.setenv("DEFAULT_STEPS", "0")
+    config = config_module.load()
+    assert config.default_steps is None
+    assert config.effective_steps == config.variant.sampling.steps
+
+
+def test_a_real_step_count_is_still_bounded_below(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Zero is the unset sentinel, not a licence to accept any small number.
+    monkeypatch.setenv("DEFAULT_STEPS", "-1")
+    with pytest.raises(WorkerError) as excinfo:
+        config_module.load()
+    assert excinfo.value.code is ErrorCode.INVALID_INPUT
 
 
 def test_raising_steps_on_a_distilled_profile_warns(

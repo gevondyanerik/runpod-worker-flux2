@@ -74,9 +74,12 @@ def _env_int_or_none(name: str, *, minimum: int, maximum: int) -> int | None:
     Distinct from ``_env_int``: there is no single sensible default here,
     because the right value depends on the profile. Unset must therefore stay
     unset rather than collapse to a number.
+
+    Zero counts as unset. The Hub renders a number input as a stepper that
+    cannot be left blank: it starts at 0 and submits it, so without this a
+    deploy that changed nothing would be refused over a value nobody chose.
     """
-    raw = _env(name)
-    if raw is None:
+    if _env(name) in (None, "0"):
         return None
     return _env_int(name, 0, minimum=minimum, maximum=maximum)
 
