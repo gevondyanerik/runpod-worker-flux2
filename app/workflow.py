@@ -10,8 +10,8 @@ The graph shape mirrors the official ComfyUI templates
 flattened out of their subgraphs:
 
     UNETLoader ─────────────────────────────► CFGGuider.model
-    CLIPLoader ──► CLIPTextEncode ──┬───────► (positive chain)
-                                    └─► ConditioningZeroOut ─► (negative chain)
+    CLIPLoader ──► CLIPTextEncode ──────────► (positive chain)
+               └─► negative branch ─────────► (negative chain)
     VAELoader ──┬─────────────────────────► VAEDecode.vae
                 └─────────────────────────► VAEEncode.vae
 
@@ -23,6 +23,14 @@ flattened out of their subgraphs:
     RandomNoise ┐
     CFGGuider   ├─► SamplerCustomAdvanced ─► VAEDecode ─► SaveImage
     KSamplerSelect, Flux2Scheduler, EmptyFlux2LatentImage ┘
+
+The negative branch differs by profile, and it is not cosmetic. The distilled
+templates zero the positive conditioning out (``ConditioningZeroOut``), which
+is free and harmless because they sample at cfg 1.0, where the negative is
+never evaluated. The base templates encode an actual empty prompt instead,
+because at cfg 5.0 the negative *is* evaluated — and a zeroed tensor is not the
+same thing as the encoding of an empty string. Using the zeroed tensor there
+produces wildly oversaturated images that ignore the prompt.
 
 Why this is built in code rather than loaded from a static JSON template: the
 reference chain has a variable length. ComfyUI's API format has no notion of a
@@ -141,10 +149,18 @@ def build(
             {"clip": [N_CLIP, 0], "text": prompt},
             "FLUX2_PROMPT",
         ),
-        N_NEGATIVE: _node(
-            "ConditioningZeroOut",
-            {"conditioning": [N_PROMPT, 0]},
-            "FLUX2_NEGATIVE",
+        N_NEGATIVE: (
+            _node(
+                "ConditioningZeroOut",
+                {"conditioning": [N_PROMPT, 0]},
+                "FLUX2_NEGATIVE",
+            )
+            if variant.distilled
+            else _node(
+                "CLIPTextEncode",
+                {"clip": [N_CLIP, 0], "text": ""},
+                "FLUX2_NEGATIVE",
+            )
         ),
         N_SAMPLER: _node(
             "KSamplerSelect",

@@ -62,12 +62,13 @@
     "_meta": {
       "title": "FLUX2_NEGATIVE"
     },
-    "class_type": "ConditioningZeroOut",
+    "class_type": "CLIPTextEncode",
     "inputs": {
-      "conditioning": [
-        "prompt",
+      "clip": [
+        "clip",
         0
-      ]
+      ],
+      "text": ""
     }
   },
   "noise": {

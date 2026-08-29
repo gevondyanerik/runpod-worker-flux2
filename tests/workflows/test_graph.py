@@ -27,6 +27,35 @@ def build(**overrides: object) -> dict:
     return workflow.build(**kwargs)  # type: ignore[arg-type]
 
 
+def test_distilled_zeroes_the_negative_out() -> None:
+    # At cfg 1.0 the negative is never evaluated, so the cheap node is right.
+    graph = build(variant=get_variant("klein-4b"))
+    assert graph[workflow.N_NEGATIVE]["class_type"] == "ConditioningZeroOut"
+
+
+def test_base_encodes_an_actual_empty_prompt() -> None:
+    # The bug this pins: at cfg 5.0 the negative *is* evaluated, and a zeroed
+    # conditioning tensor is not the encoding of an empty string. Using
+    # ConditioningZeroOut here produces wildly oversaturated images that ignore
+    # the prompt — confirmed on a real GPU before it was fixed.
+    for name in ("klein-4b-base", "klein-4b-base-bf16"):
+        graph = build(variant=get_variant(name), steps=20, guidance=5.0)
+        node = graph[workflow.N_NEGATIVE]
+        assert node["class_type"] == "CLIPTextEncode", name
+        assert node["inputs"]["text"] == ""
+        assert node["inputs"]["clip"] == [workflow.N_CLIP, 0]
+
+
+def test_every_profile_wires_a_negative_branch() -> None:
+    for name in VARIANTS:
+        variant = get_variant(name)
+        graph = build(variant=variant, steps=variant.sampling.steps)
+        assert graph[workflow.N_GUIDER]["inputs"]["negative"] == [
+            workflow.N_NEGATIVE,
+            0,
+        ], name
+
+
 def test_text_to_image_graph_validates() -> None:
     graph = build()
     workflow.validate(graph, expected_references=0)
