@@ -176,6 +176,27 @@ a fresh download that does not match its digest is deleted rather than served.
 An unknown `FLUX2_VARIANT` fails startup instead of falling back: a typo must
 never quietly deploy a different model.
 
+### Measured
+
+One RTX PRO 4500 Blackwell (32 GB), ComfyUI v0.34.0, torch 2.11.0+cu128,
+2026-08-29. Inference only, excluding encode and upload. Numbers from one
+card on one day — treat them as ratios, not guarantees.
+
+| | 1024² t2i | edit, 1 ref | edit, 2 refs | VRAM in use |
+|---|---|---|---|---|
+| `klein-4b` (4 steps) | 2.0 s | 3.5 s | 5.0 s | 12.8 GB |
+| `klein-4b-nvfp4` (4 steps) | 3.5 s | 6.0 s | 9.3 s | 11.2 GB |
+| `klein-4b-base` (20 steps) | 11.0 s | 23.1 s | 38.6 s | 12.8 GB |
+
+Two things worth reading off that table:
+
+- **NVFP4 is the small option, not the fast one.** It is 75% slower than fp8
+  here. Its 2.5 GB download shortens cold starts; its kernels do not shorten
+  inference.
+- **VRAM barely moves between profiles**, because the bf16 text encoder sets
+  the floor. Only `FLUX2_TEXT_ENCODER=fp4` moves it, and it moves it by about
+  1.5 GB.
+
 ---
 
 ## Configuration

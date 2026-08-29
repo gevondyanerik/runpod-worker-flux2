@@ -143,8 +143,13 @@ class VariantConfig:
     sampling: SamplingDefaults = field(default_factory=SamplingDefaults)
 
     # nvfp4 needs Blackwell (compute capability >= 12.0). On older
-    # architectures it may load without delivering the speed or memory win, so
-    # the worker refuses to start rather than running slowly and silently.
+    # architectures it may load without delivering the memory win, so the
+    # worker refuses to start rather than running slowly and silently.
+    #
+    # Note that nvfp4 is not the fast option. Measured on an RTX PRO 4500
+    # Blackwell it took 3.5 s to fp8's 2.0 s at 1024x1024 — the kernels are not
+    # the win here; the 2.5 GB download is. Pick it to shrink cold starts, not
+    # to shorten inference.
     requires_compute_capability: tuple[int, int] | None = None
 
     max_reference_images: int = 6
@@ -226,7 +231,7 @@ _PROFILES: tuple[VariantConfig, ...] = (
     ),
     VariantConfig(
         name="klein-4b-nvfp4",
-        description="Distilled 4B, NVFP4 — smallest and fastest on Blackwell GPUs.",
+        description="Distilled 4B, NVFP4 — smallest download. Blackwell GPUs only.",
         distilled=True,
         precision="nvfp4",
         sampling=DISTILLED_SAMPLING,
