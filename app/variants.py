@@ -86,11 +86,23 @@ class SamplingDefaults:
         return None not in (self.steps, self.guidance, self.sampler)
 
 
-# Confirmed against the official ComfyUI templates on 2026-08-29.
-#   distilled  -> Flux2Scheduler steps=4,  CFGGuider cfg=1, KSamplerSelect euler
-#   base       -> Flux2Scheduler steps=20, CFGGuider cfg=5, KSamplerSelect euler
+# Distilled: taken verbatim from the official ComfyUI templates, confirmed
+# 2026-08-29 (Flux2Scheduler steps=4, CFGGuider cfg=1, KSamplerSelect euler).
+# The distilled models are trained to converge at 4 steps, so this is the
+# model's number, not a preference — raising it changes the image rather than
+# improving it.
 DISTILLED_SAMPLING = SamplingDefaults(steps=4, guidance=1.0, sampler="euler")
-BASE_SAMPLING = SamplingDefaults(steps=20, guidance=5.0, sampler="euler")
+
+# Base: the official template ships 20 steps at cfg 5.0. This worker serves 50
+# at cfg 4.0 instead — an undistilled model keeps gaining detail well past the
+# template's step count, and cfg 5.0 pushes contrast further than product
+# photography wants. Sampler unchanged.
+#
+# This is the one place where a shipped default departs from the template, so
+# it is called out rather than left to be discovered: a base request costs
+# roughly 2.5x what the template's numbers would, and callers who want the
+# cheaper setting send steps=20 per request.
+BASE_SAMPLING = SamplingDefaults(steps=50, guidance=4.0, sampler="euler")
 
 
 # --------------------------------------------------------------------------

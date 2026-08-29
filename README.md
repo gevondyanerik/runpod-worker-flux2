@@ -28,6 +28,7 @@ and used commercially without a separate agreement. See
 ## Contents
 
 - [What it does](#what-it-does)
+- [Samples](#samples)
 - [Quick start](#quick-start)
 - [API](#api)
 - [Models](#models)
@@ -58,6 +59,61 @@ future change to the graph a breaking API change. If you want a general-purpose
 ComfyUI host, use
 [worker-comfyui](https://github.com/runpod-workers/worker-comfyui); this worker
 is the opposite trade.
+
+---
+
+## Samples
+
+Every image below was produced by this worker, on one RTX PRO 4500 Blackwell,
+with each profile's shipped defaults and the same prompt and seed across the
+three columns. Nothing is cherry-picked from a batch and nothing is retouched.
+
+### Text to image
+
+![Text to image across the three profiles](docs/samples/bag.webp)
+
+### Text rendering
+
+![Text rendering across the three profiles](docs/samples/text.webp)
+
+Legible signage is the capability most worth checking before trusting an image
+model with a banner, and it is where the distilled profiles are strongest. Note
+the base column: at 50 steps it renders an extra letter. On this prompt the
+distilled profiles were the more reliable spellers, which is not the ranking
+the step counts suggest.
+
+### Image editing, one reference
+
+![A recolour edit across the three profiles](docs/samples/edit-colour.webp)
+
+The prompt asked only for the colour to change. Shape, background, lighting
+direction, shadow and hardware all survive — that is the property that makes
+this useful for product work, where one photograph has to become a dozen
+variants of the same object.
+
+### Two references
+
+![A two-reference composite across the three profiles](docs/samples/two-refs.webp)
+
+Subject from the first reference, lettering style and palette from the second.
+References condition the generation in the order you send them, so a prompt can
+address them positionally.
+
+### What the set shows
+
+- **`klein-4b` is the right default.** At 4 steps it is not a preview tier; it
+  is the production output, and it renders text more reliably than the base
+  profile does here.
+- **`klein-4b-nvfp4` is visually near-identical to `klein-4b`** at the same
+  seed. It is the small-download option, not the fast one — see
+  [Measured](#measured).
+- **`klein-4b-base` is a different look, not a strictly better one.** Cleaner
+  and more catalogue-like, with less material texture, and slower by more than
+  an order of magnitude. Reach for it when prompt adherence matters more than
+  throughput, not as a default upgrade.
+
+A handful of seeds is not a benchmark. Treat these as a demonstration that each
+path works end to end, and run your own prompts before committing.
 
 ---
 
@@ -163,8 +219,8 @@ everything else follows from it.
 | `klein-4b` *(default)* | fp8 | 4 | baked in | Best speed/size balance |
 | `klein-4b-bf16` | bf16 | 4 | 7.8 GB | Full-precision reference |
 | `klein-4b-nvfp4` | NVFP4 | 4 | 2.5 GB | Blackwell only (compute ≥ 12.0) |
-| `klein-4b-base` | fp8 | 20 | 4.1 GB | Slower, stronger prompt adherence |
-| `klein-4b-base-bf16` | bf16 | 20 | 7.8 GB | Quality ceiling of this family |
+| `klein-4b-base` | fp8 | 50 | 4.1 GB | Slower, stronger prompt adherence |
+| `klein-4b-base-bf16` | bf16 | 50 | 7.8 GB | Quality ceiling of this family |
 
 All five share the same Qwen3-4B text encoder and FLUX.2 VAE, both baked into
 the image, so switching profiles only downloads a diffusion model.
@@ -191,7 +247,9 @@ be measurable by this method.
 |---|---|---|---|---|
 | `klein-4b` (4 steps) | 2.0 s | 3.5 s | 5.0 s | 12.8 GB |
 | `klein-4b-nvfp4` (4 steps) | 3.5 s | 6.0 s | 9.3 s | 11.2 GB |
-| `klein-4b-base` (20 steps) | 11.0 s | 23.1 s | 38.6 s | 12.8 GB |
+| `klein-4b-base` (50 steps) | 26.3 s | 56.6 s | 94.7 s | 12.8 GB |
+
+Excluding the first image of a run, which carries the model load.
 
 Two things worth reading off that table:
 
@@ -201,6 +259,9 @@ Two things worth reading off that table:
 - **VRAM barely moves between profiles**, because the bf16 text encoder sets
   the floor. Only `FLUX2_TEXT_ENCODER=fp4` moves it, and it moves it by about
   1.5 GB.
+- **The base profile is an order of magnitude slower**, and on a busy endpoint
+  a two-reference edit at 95 s is a very different cost model from 5 s. Budget
+  for it before choosing that profile.
 
 ---
 
@@ -215,6 +276,33 @@ credential is needed on the default path.
 |---|---|---|
 | `FLUX2_VARIANT` | `klein-4b` | Which model to serve |
 
+### Sampling steps
+
+`DEFAULT_STEPS` sets the step count for requests that do not carry their own.
+Leave it empty and each profile uses its own default — 4 for the distilled
+models, 50 for the base ones. A request that sends `steps` overrides it either
+way, so this is the endpoint's house default, not a ceiling.
+
+Worth knowing before you raise it on a distilled profile. Measured on the bag
+prompt at a fixed seed, 4 → 20 steps did not improve detail or text rendering;
+it changed the composition, adding a shoulder strap nobody asked for, and took
+2.8x as long. A distilled model is trained to converge in its native step
+count, so extra steps buy a different image rather than a better one. The
+worker will do it — it is your endpoint — and logs a line at startup saying
+what it thinks.
+
+The base profiles are the opposite case: undistilled, so the extra steps are
+doing real work, which is why they default to 50.
+
+If what you want is more quality rather than more steps, the profile is the
+lever: `klein-4b-base` samples at 50 steps and cfg 4.0, where the extra
+compute is doing something the model was trained to use.
+
+`guidance` is deliberately **not** an environment variable. It is a per-request
+field, and on a distilled profile the only correct value is 1.0 — cfg 2.5
+already oversaturates and cfg 5.0 destroys the image. That is a property of the
+model, not a preference, so it stays out of endpoint configuration.
+
 ### Endpoint policy
 
 | Variable | Default | Purpose |
@@ -222,6 +310,7 @@ credential is needed on the default path.
 | `FLUX2_TEXT_ENCODER` | `bf16` | `bf16` (8.0 GB, baked in) or `fp4` (3.8 GB) |
 | `MODEL_SOURCE` | `auto` | `auto`, `baked`, `volume` or `download` |
 | `DEFAULT_WIDTH` / `DEFAULT_HEIGHT` | 1024 | Used when a request omits them |
+| `DEFAULT_STEPS` | *the profile's* | Sampling steps when a request omits them |
 | `MAX_PIXELS` | 4194304 | Ceiling on width × height |
 | `MAX_IMAGES_PER_REQUEST` | 4 | Upper bound on `n` |
 | `MAX_INPUT_IMAGES` | 6 | Can lower the profile's limit, never raise it |

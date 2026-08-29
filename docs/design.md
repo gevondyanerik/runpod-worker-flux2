@@ -93,10 +93,19 @@ If you want the other trade, `worker-comfyui` exists and is good at it.
 `SamplingDefaults.confirmed` gates `VariantConfig.is_ready`, and the startup
 path refuses to serve an unready profile.
 
-The values come from the official ComfyUI templates: 4 steps and cfg 1.0 for
-the distilled profiles, 20 and 5.0 for base. A worker with plausible-looking
-guessed defaults runs perfectly and produces quietly worse images, which is a
-much more expensive failure than not starting.
+The distilled values come from the official ComfyUI templates: 4 steps at cfg
+1.0. That is the count the model is trained to converge in, so it is the
+model's number rather than a choice.
+
+The base profiles ship 50 steps at cfg 4.0, where the template says 20 at 5.0.
+An undistilled model keeps gaining detail past 20, and cfg 5.0 overshoots the
+contrast that product photography wants. This is a deliberate departure and the
+only one, which is why `app/variants.py` explains it at the constant rather
+than leaving it to be found.
+
+Either way the point stands: a worker with plausible-looking guessed defaults
+runs perfectly and produces quietly worse images, which is a much more
+expensive failure than not starting.
 
 The same reasoning governs `VramProbe`: only `scripts/benchmark.py` on real
 hardware may write one. A fabricated number is worse than a missing one because

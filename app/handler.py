@@ -56,6 +56,10 @@ def init(comfy: ComfyClient | None = None) -> None:
     _GPU_NAME = _detect_gpu()
     log.info("worker configured", extra=config_module.describe(_CONFIG))
 
+    warning = config_module.step_warning(_CONFIG)
+    if warning is not None:
+        log.warning("%s", warning)
+
 
 def _detect_gpu() -> str | None:
     try:

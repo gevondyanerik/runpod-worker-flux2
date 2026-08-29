@@ -37,8 +37,8 @@ def cases() -> Iterator[tuple[str, dict[str, Any]]]:
             width=1024,
             height=1024,
             seed=42,
-            steps=20,
-            guidance=5.0,
+            steps=50,
+            guidance=4.0,
         ),
     )
     yield (

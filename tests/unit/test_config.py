@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app import config as config_module
+from app import constants
 from app.errors import ErrorCode, WorkerError
 from app.variants import DEFAULT_VARIANT
 
@@ -147,3 +148,66 @@ def test_only_config_reads_the_environment() -> None:
         text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_steps_follow_the_profile_when_unset() -> None:
+    # Unset must stay unset: the right step count differs per profile, so
+    # collapsing it to a number here would silently mis-sample one of them.
+    config = config_module.load()
+    assert config.default_steps is None
+    assert config.effective_steps == config.variant.sampling.steps
+
+
+def test_default_steps_overrides_the_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEFAULT_STEPS", "8")
+    config = config_module.load()
+    assert config.default_steps == 8
+    assert config.effective_steps == 8
+
+
+def test_default_steps_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEFAULT_STEPS", "0")
+    with pytest.raises(WorkerError) as excinfo:
+        config_module.load()
+    assert excinfo.value.code is ErrorCode.INVALID_INPUT
+
+    monkeypatch.setenv("DEFAULT_STEPS", str(constants.MAX_STEPS + 1))
+    with pytest.raises(WorkerError):
+        config_module.load()
+
+
+def test_blank_default_steps_means_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The Hub sends an empty string for a field the deployer left alone.
+    monkeypatch.setenv("DEFAULT_STEPS", "")
+    config = config_module.load()
+    assert config.default_steps is None
+    assert config.effective_steps == config.variant.sampling.steps
+
+
+def test_raising_steps_on_a_distilled_profile_warns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Measured, not assumed: more steps on a distilled model changes the image
+    # rather than improving it. The worker obeys and says so.
+    monkeypatch.setenv("DEFAULT_STEPS", "20")
+    warning = config_module.step_warning(config_module.load())
+    assert warning is not None
+    assert "klein-4b" in warning and "20" in warning
+
+
+def test_no_warning_for_a_base_profile_or_a_lower_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUX2_VARIANT", "klein-4b-base")
+    monkeypatch.setenv("DEFAULT_STEPS", "28")
+    assert config_module.step_warning(config_module.load()) is None
+
+    monkeypatch.setenv("FLUX2_VARIANT", "klein-4b")
+    monkeypatch.setenv("DEFAULT_STEPS", "2")
+    assert config_module.step_warning(config_module.load()) is None
+
+
+def test_describe_reports_a_step_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert "default_steps" not in config_module.describe(config_module.load())
+    monkeypatch.setenv("DEFAULT_STEPS", "6")
+    assert config_module.describe(config_module.load())["default_steps"] == 6

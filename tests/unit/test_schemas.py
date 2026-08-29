@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from app import constants, schemas
@@ -114,3 +116,25 @@ def test_capabilities_describes_the_endpoint(config: Config) -> None:
     assert described["api_version"] == constants.API_VERSION
     assert described["max_reference_images"] == config.max_reference_images
     assert described["gpu"] == "NVIDIA RTX PRO 4500 Blackwell"
+
+
+def test_default_steps_reaches_a_request_that_omits_them(config: Config) -> None:
+    endpoint = replace(config, default_steps=8)
+    assert schemas.parse({"prompt": "a red bicycle"}, endpoint).steps == 8
+
+
+def test_a_request_still_outranks_the_endpoint_default(config: Config) -> None:
+    # The endpoint sets a house default; a caller who names a number gets it.
+    endpoint = replace(config, default_steps=8)
+    parsed = schemas.parse({"prompt": "a red bicycle", "steps": 4}, endpoint)
+    assert parsed.steps == 4
+
+
+def test_capabilities_reports_the_effective_step_count(config: Config) -> None:
+    # An integrator reads this to learn the endpoint's behaviour, so it must
+    # report what will actually happen, not what the profile would do alone.
+    assert schemas.capabilities(config)["default_steps"] == (
+        config.variant.sampling.steps
+    )
+    endpoint = replace(config, default_steps=8)
+    assert schemas.capabilities(endpoint)["default_steps"] == 8

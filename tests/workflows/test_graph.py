@@ -39,7 +39,7 @@ def test_base_encodes_an_actual_empty_prompt() -> None:
     # ConditioningZeroOut here produces wildly oversaturated images that ignore
     # the prompt — confirmed on a real GPU before it was fixed.
     for name in ("klein-4b-base", "klein-4b-base-bf16"):
-        graph = build(variant=get_variant(name), steps=20, guidance=5.0)
+        graph = build(variant=get_variant(name), steps=50, guidance=4.0)
         node = graph[workflow.N_NEGATIVE]
         assert node["class_type"] == "CLIPTextEncode", name
         assert node["inputs"]["text"] == ""

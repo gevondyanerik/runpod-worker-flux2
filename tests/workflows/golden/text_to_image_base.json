@@ -32,7 +32,7 @@
     },
     "class_type": "CFGGuider",
     "inputs": {
-      "cfg": 5.0,
+      "cfg": 4.0,
       "model": [
         "unet",
         0
@@ -150,7 +150,7 @@
     "class_type": "Flux2Scheduler",
     "inputs": {
       "height": 1024,
-      "steps": 20,
+      "steps": 50,
       "width": 1024
     }
   },

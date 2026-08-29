@@ -145,7 +145,7 @@ def parse(payload: dict[str, Any], config: Config) -> ResolvedRequest:
         width=aligned_w,
         height=aligned_h,
         n=request.n,
-        steps=request.steps or config.variant.sampling.steps or 4,
+        steps=request.steps or config.effective_steps,
         guidance=(
             request.guidance
             if request.guidance is not None
@@ -187,7 +187,7 @@ def capabilities(config: Config, gpu_name: str | None = None) -> dict[str, Any]:
         "distilled": variant.distilled,
         "precision": variant.precision,
         "text_encoder": "fp4" if "fp4" in variant.text_encoder.filename else "bf16",
-        "default_steps": variant.sampling.steps,
+        "default_steps": config.effective_steps,
         "default_guidance": variant.sampling.guidance,
         "default_width": config.default_width,
         "default_height": config.default_height,

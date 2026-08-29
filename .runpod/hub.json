@@ -64,6 +64,17 @@
         }
       },
       {
+        "key": "DEFAULT_STEPS",
+        "input": {
+          "name": "Sampling steps",
+          "type": "number",
+          "description": "Steps for requests that do not specify their own. Leave empty to follow the profile: 4 for the distilled models, 50 for the base ones. The distilled models are trained to converge at 4, so raising it there changes the image rather than improving it and costs proportionally more GPU time. A request may always override this per image.",
+          "min": 1,
+          "max": 60,
+          "advanced": false
+        }
+      },
+      {
         "key": "FLUX2_TEXT_ENCODER",
         "input": {
           "name": "Text encoder precision",

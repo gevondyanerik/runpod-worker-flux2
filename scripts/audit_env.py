@@ -25,7 +25,7 @@ IMAGE_ONLY = {"FLUX2_BAKED_VARIANT"}
 
 def from_config() -> set[str]:
     source = (ROOT / "app" / "config.py").read_text()
-    names = set(re.findall(r'_env(?:_int|_choice)?\(\s*"([A-Z0-9_]+)"', source))
+    names = set(re.findall(r'_env[a-z_]*\(\s*"([A-Z0-9_]+)"', source))
     # The three asset overrides are built from a prefix, so they never appear
     # as literals.
     for prefix in ("DIFFUSION_MODEL", "TEXT_ENCODER", "VAE"):

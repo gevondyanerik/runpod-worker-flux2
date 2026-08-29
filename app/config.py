@@ -68,6 +68,19 @@ def _env_int(name: str, default: int, *, minimum: int, maximum: int) -> int:
     return value
 
 
+def _env_int_or_none(name: str, *, minimum: int, maximum: int) -> int | None:
+    """An integer that, when unset, means "whatever the profile says".
+
+    Distinct from ``_env_int``: there is no single sensible default here,
+    because the right value depends on the profile. Unset must therefore stay
+    unset rather than collapse to a number.
+    """
+    raw = _env(name)
+    if raw is None:
+        return None
+    return _env_int(name, 0, minimum=minimum, maximum=maximum)
+
+
 def _env_choice(name: str, default: str, allowed: tuple[str, ...]) -> str:
     raw = _env(name)
     if raw is None:
@@ -104,6 +117,7 @@ class Config:
 
     default_width: int
     default_height: int
+    default_steps: int | None
     max_pixels: int
     max_images_per_request: int
 
@@ -119,6 +133,17 @@ class Config:
     @property
     def uses_s3(self) -> bool:
         return self.s3 is not None
+
+    @property
+    def effective_steps(self) -> int:
+        """Steps for a request that does not specify them.
+
+        ``DEFAULT_STEPS`` outranks the profile, and a request outranks both.
+        The fallback of 4 is unreachable in practice — every shipped profile
+        has confirmed sampling defaults — but the type says ``int | None`` and
+        this keeps the resolution total.
+        """
+        return self.default_steps or self.variant.sampling.steps or 4
 
     @property
     def max_reference_images(self) -> int:
@@ -258,6 +283,9 @@ def load() -> Config:
             minimum=constants.MIN_DIMENSION,
             maximum=constants.MAX_DIMENSION,
         ),
+        default_steps=_env_int_or_none(
+            "DEFAULT_STEPS", minimum=1, maximum=constants.MAX_STEPS
+        ),
         max_pixels=_env_int(
             "MAX_PIXELS",
             variant.max_output_pixels,
@@ -283,6 +311,32 @@ def load() -> Config:
     )
 
 
+def step_warning(config: Config) -> str | None:
+    """Whether ``DEFAULT_STEPS`` is set to something that will not help.
+
+    Measured on a distilled profile (RTX PRO 4500, 2026-08-29): raising 4 steps
+    to 20 changed the composition and cost 2.8x the time without improving
+    detail or text rendering. A distilled model is trained to converge in its
+    native step count, so extra steps buy a different image, not a better one.
+
+    A warning rather than a clamp: the operator asked for this, and an
+    endpoint that silently ignored its own configuration would be worse than
+    one that does what it was told and says what it thinks.
+    """
+    steps = config.default_steps
+    if steps is None:
+        return None
+    native = config.variant.sampling.steps
+    if native is None or not config.variant.distilled or steps <= native:
+        return None
+    return (
+        f"DEFAULT_STEPS={steps} on distilled profile {config.variant.name}, "
+        f"which is trained for {native}. Extra steps change the composition "
+        f"rather than improve it, and cost proportionally more. For higher "
+        f"quality prefer FLUX2_VARIANT=klein-4b-base."
+    )
+
+
 def describe(config: Config) -> dict[str, object]:
     """Non-default settings, for the startup log.
 
@@ -296,6 +350,8 @@ def describe(config: Config) -> dict[str, object]:
         "model_source": config.model_source,
         "output": "s3" if config.uses_s3 else "base64",
     }
+    if config.default_steps is not None:
+        described["default_steps"] = config.default_steps
     if config.overrides:
         described["overrides"] = config.overrides
     return described
