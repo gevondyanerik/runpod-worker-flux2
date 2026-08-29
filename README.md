@@ -1,6 +1,6 @@
 # runpod-worker-flux2
 
-[![Runpod](https://api.runpod.io/badge/gevondyanerik/runpod-worker-flux2)](https://console.runpod.io/hub/gevondyanerik/runpod-worker-flux2)
+[![Runpod](https://api.runpod.io/badge/gevondyanerik/runpod-worker-flux2)](https://console.runpod.io/hub/listing/gevondyanerik/runpod-worker-flux2)
 [![CI](https://github.com/gevondyanerik/runpod-worker-flux2/actions/workflows/ci.yml/badge.svg)](https://github.com/gevondyanerik/runpod-worker-flux2/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
