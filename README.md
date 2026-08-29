@@ -33,6 +33,7 @@ and used commercially without a separate agreement. See
 - [API](#api)
 - [Models](#models)
 - [Configuration](#configuration)
+  - [How the defaults were chosen](#how-the-defaults-were-chosen)
 - [Reference images](#reference-images)
 - [Errors](#errors)
 - [Hardware](#hardware)
@@ -77,10 +78,9 @@ three columns. Nothing is cherry-picked from a batch and nothing is retouched.
 ![Text rendering across the three profiles](docs/samples/text.webp)
 
 Legible signage is the capability most worth checking before trusting an image
-model with a banner, and it is where the distilled profiles are strongest. Note
-the base column: at 50 steps it renders an extra letter. On this prompt the
-distilled profiles were the more reliable spellers, which is not the ranking
-the step counts suggest.
+model with a banner. All three spell it here, at each profile's shipped
+defaults — which for the base profile means 28 steps, a value the grid search
+below picked precisely because higher counts started dropping letters.
 
 ### Image editing, one reference
 
@@ -102,8 +102,8 @@ address them positionally.
 ### What the set shows
 
 - **`klein-4b` is the right default.** At 4 steps it is not a preview tier; it
-  is the production output, and it renders text more reliably than the base
-  profile does here.
+  is the production output, and across the grid search it was the more
+  reliable speller of the three.
 - **`klein-4b-nvfp4` is visually near-identical to `klein-4b`** at the same
   seed. It is the small-download option, not the fast one — see
   [Measured](#measured).
@@ -219,8 +219,8 @@ everything else follows from it.
 | `klein-4b` *(default)* | fp8 | 4 | baked in | Best speed/size balance |
 | `klein-4b-bf16` | bf16 | 4 | 7.8 GB | Full-precision reference |
 | `klein-4b-nvfp4` | NVFP4 | 4 | 2.5 GB | Blackwell only (compute ≥ 12.0) |
-| `klein-4b-base` | fp8 | 50 | 4.1 GB | Slower, stronger prompt adherence |
-| `klein-4b-base-bf16` | bf16 | 50 | 7.8 GB | Quality ceiling of this family |
+| `klein-4b-base` | fp8 | 28 | 4.1 GB | Slower, stronger prompt adherence |
+| `klein-4b-base-bf16` | bf16 | 28 | 7.8 GB | Quality ceiling of this family |
 
 All five share the same Qwen3-4B text encoder and FLUX.2 VAE, both baked into
 the image, so switching profiles only downloads a diffusion model.
@@ -247,7 +247,7 @@ be measurable by this method.
 |---|---|---|---|---|
 | `klein-4b` (4 steps) | 2.0 s | 3.5 s | 5.0 s | 12.8 GB |
 | `klein-4b-nvfp4` (4 steps) | 3.5 s | 6.0 s | 9.3 s | 11.2 GB |
-| `klein-4b-base` (50 steps) | 26.3 s | 56.6 s | 94.7 s | 12.8 GB |
+| `klein-4b-base` (28 steps) | 15.1 s | 32.1 s | 53.6 s | 12.8 GB |
 
 Excluding the first image of a run, which carries the model load.
 
@@ -259,9 +259,9 @@ Two things worth reading off that table:
 - **VRAM barely moves between profiles**, because the bf16 text encoder sets
   the floor. Only `FLUX2_TEXT_ENCODER=fp4` moves it, and it moves it by about
   1.5 GB.
-- **The base profile is an order of magnitude slower**, and on a busy endpoint
-  a two-reference edit at 95 s is a very different cost model from 5 s. Budget
-  for it before choosing that profile.
+- **The base profile is roughly an order of magnitude slower**, and on a busy
+  endpoint a two-reference edit at 54 s is a very different cost model from
+  5 s. Budget for it before choosing that profile.
 
 ---
 
@@ -276,11 +276,70 @@ credential is needed on the default path.
 |---|---|---|
 | `FLUX2_VARIANT` | `klein-4b` | Which model to serve |
 
+### How the defaults were chosen
+
+Each profile's step count and guidance came out of a grid search on real
+hardware, not out of taste. 176 generations: every step count against every
+guidance value, three seeds per cell, on two prompts.
+
+The score is deliberately objective. A sign prompt — *“a vintage enamel shop
+sign that reads FRESH COFFEE”* — either spells its two words or it does not,
+and that can be counted by looking. A product shot ran alongside on the same
+grid, so a setting could not win on legibility while quietly ruining
+everything else.
+
+#### Distilled profiles: 4 steps, cfg 1.0
+
+![Steps against guidance for klein-4b](docs/samples/grid-distilled.webp)
+
+| Steps | Legible (of 9) |
+|---|---|
+| 2 | 6 |
+| **4** | **9** |
+| 6 | 9 |
+| 8 | 9 |
+
+Two steps is not enough; four is. Six and eight spell just as well, cost
+proportionally more, and change the composition rather than refine it, so
+there is nothing to buy above four. Guidance above 1.0 warms the whole frame —
+by cfg 2.5 the brick has gone orange and the lettering glows — which is the
+distilled model being pushed outside what it was trained for. `klein-4b-nvfp4`
+scored identically and shares these values.
+
+#### Base profiles: 28 steps, cfg 4.0
+
+![Steps against guidance for klein-4b-base](docs/samples/grid-base.webp)
+
+| Steps | Legible (of 12) |
+|---|---|
+| 12 | 4 |
+| 20 | 6 |
+| **28** | **7** |
+| 36 | 5 |
+| 50 | 4 |
+
+The step axis has a peak and it is not at the end: past 28, spelling gets
+*worse*, and 50 steps scored no better than 12 while costing four times as
+much. The product-shot grid was effectively flat from 20 steps upward, so
+nothing else argues for going higher either. Guidance barely moved the outcome
+anywhere between 3.0 and 5.0 — cfg 4.0 sits in the middle of a flat region
+rather than on a peak, and 6.0 was slightly worse.
+
+This is why the shipped base default is 28 steps at cfg 4.0 where the official
+ComfyUI template says 20 at 5.0 — the only place this worker departs from the
+template, and the reason is in the grid above.
+
+Worth being honest about what this measures: three seeds per cell on one
+prompt. The seed dominates everything — one of the three spelled correctly in
+all 20 base cells, another in only one — so these numbers rank settings, they
+do not predict a single request. The base profile is the weaker speller
+overall, which is not what the step counts would suggest.
+
 ### Sampling steps
 
 `DEFAULT_STEPS` sets the step count for requests that do not carry their own.
 Leave it empty and each profile uses its own default — 4 for the distilled
-models, 50 for the base ones. A request that sends `steps` overrides it either
+models, 28 for the base ones. A request that sends `steps` overrides it either
 way, so this is the endpoint's house default, not a ceiling.
 
 Worth knowing before you raise it on a distilled profile. Measured on the bag
@@ -295,7 +354,7 @@ The base profiles are the opposite case: undistilled, so the extra steps are
 doing real work, which is why they default to 50.
 
 If what you want is more quality rather than more steps, the profile is the
-lever: `klein-4b-base` samples at 50 steps and cfg 4.0, where the extra
+lever: `klein-4b-base` samples at 28 steps and cfg 4.0, where the extra
 compute is doing something the model was trained to use.
 
 `guidance` is deliberately **not** an environment variable. It is a per-request

@@ -93,16 +93,21 @@ class SamplingDefaults:
 # improving it.
 DISTILLED_SAMPLING = SamplingDefaults(steps=4, guidance=1.0, sampler="euler")
 
-# Base: the official template ships 20 steps at cfg 5.0. This worker serves 50
-# at cfg 4.0 instead — an undistilled model keeps gaining detail well past the
-# template's step count, and cfg 5.0 pushes contrast further than product
-# photography wants. Sampler unchanged.
+# Base: the official template ships 20 steps at cfg 5.0. This worker serves 28
+# at cfg 4.0, chosen by a grid search rather than by taste — steps in
+# {12, 20, 28, 36, 50} against guidance in {3, 4, 5, 6}, three seeds per cell,
+# scored on whether a sign prompt spelled its two words correctly (see
+# docs/samples/grid-base.webp).
 #
-# This is the one place where a shipped default departs from the template, so
-# it is called out rather than left to be discovered: a base request costs
-# roughly 2.5x what the template's numbers would, and callers who want the
-# cheaper setting send steps=20 per request.
-BASE_SAMPLING = SamplingDefaults(steps=50, guidance=4.0, sampler="euler")
+# 28 steps was the peak of that grid: 7 of 12 cells legible, against 4 of 12 at
+# both 12 and 50. More steps than that made spelling worse, not better, and an
+# identical product-shot grid showed no visible gain past 20 either. Guidance
+# barely moved the result anywhere in 3.0-5.0, so 4.0 sits in the middle of a
+# flat region rather than on a peak. Sampler unchanged.
+#
+# This is the one shipped default that departs from the template, so it is
+# explained here rather than left to be discovered.
+BASE_SAMPLING = SamplingDefaults(steps=28, guidance=4.0, sampler="euler")
 
 
 # --------------------------------------------------------------------------

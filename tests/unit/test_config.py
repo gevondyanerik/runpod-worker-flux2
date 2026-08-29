@@ -199,7 +199,7 @@ def test_no_warning_for_a_base_profile_or_a_lower_count(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("FLUX2_VARIANT", "klein-4b-base")
-    monkeypatch.setenv("DEFAULT_STEPS", "28")
+    monkeypatch.setenv("DEFAULT_STEPS", "40")
     assert config_module.step_warning(config_module.load()) is None
 
     monkeypatch.setenv("FLUX2_VARIANT", "klein-4b")

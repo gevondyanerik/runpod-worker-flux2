@@ -97,11 +97,12 @@ The distilled values come from the official ComfyUI templates: 4 steps at cfg
 1.0. That is the count the model is trained to converge in, so it is the
 model's number rather than a choice.
 
-The base profiles ship 50 steps at cfg 4.0, where the template says 20 at 5.0.
-An undistilled model keeps gaining detail past 20, and cfg 5.0 overshoots the
-contrast that product photography wants. This is a deliberate departure and the
-only one, which is why `app/variants.py` explains it at the constant rather
-than leaving it to be found.
+The base profiles ship 28 steps at cfg 4.0, where the template says 20 at 5.0.
+That came out of a grid search — five step counts against four guidance values,
+three seeds per cell, scored on whether a text prompt rendered legibly — not
+out of taste. 28 was the peak; 50 was tied for worst. This is a deliberate
+departure and the only one, which is why `app/variants.py` explains it at the
+constant rather than leaving it to be found.
 
 Either way the point stands: a worker with plausible-looking guessed defaults
 runs perfectly and produces quietly worse images, which is a much more
