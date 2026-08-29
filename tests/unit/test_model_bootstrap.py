@@ -194,3 +194,40 @@ def test_verify_visible_passes_when_everything_is_indexed() -> None:
             return listing[class_type]
 
     models.verify_visible(Sighted(), config)
+
+
+def test_a_download_that_cannot_fit_fails_before_it_starts(
+    roots: tuple[Path, Path], config: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Running out of disk mid-download costs the whole cold start and leaves an
+    # errno in the log. The size is known in advance, so the check is too.
+    monkeypatch.setattr(models, "free_space_gb", lambda *_: 0.0)
+    monkeypatch.setattr(models, "_download", _refuse)
+
+    with pytest.raises(WorkerError) as excinfo:
+        models.ensure_assets(config)
+    assert excinfo.value.code is ErrorCode.INSUFFICIENT_DISK
+    assert "container disk" in excinfo.value.message
+
+
+def test_disk_is_not_checked_for_assets_already_present(
+    roots: tuple[Path, Path], config: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A baked image on a nearly full disk is a normal, working deployment.
+    image, _ = roots
+    for asset in config.variant.assets:
+        place(image, asset)
+
+    monkeypatch.setattr(models, "free_space_gb", lambda *_: 0.0)
+    monkeypatch.setattr(models, "_download", _refuse)
+    models.ensure_assets(config)
+
+
+def test_free_space_is_measured_where_the_models_go(
+    roots: tuple[Path, Path], tmp_path: Path
+) -> None:
+    # A default argument bound at import time would measure the production
+    # path no matter what MODELS_ROOT says.
+    image, _ = roots
+    assert not image.exists()
+    assert models.free_space_gb() > 0  # walks up to an ancestor that exists

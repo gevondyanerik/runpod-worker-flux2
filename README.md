@@ -480,7 +480,7 @@ wire: retry `IMAGE_DOWNLOAD_FAILED`, do not retry `INVALID_RESOLUTION`.
 |---|---|
 | Request | `MISSING_PROMPT`, `INVALID_INPUT`, `INVALID_RESOLUTION`, `TOO_MANY_IMAGES` |
 | References | `INVALID_IMAGE_URL`, `IMAGE_DOWNLOAD_FAILED`, `IMAGE_TOO_LARGE`, `TOTAL_INPUT_TOO_LARGE`, `INVALID_IMAGE` |
-| Deployment | `UNSUPPORTED_VARIANT`, `UNSUPPORTED_GPU_ARCH`, `MODEL_ASSET_MISSING`, `MODEL_CHECKSUM_MISMATCH`, `MODEL_AUTH_REQUIRED`, `PROFILE_NOT_READY`, `COMFYUI_START_FAILED`, `WORKFLOW_INVALID` |
+| Deployment | `UNSUPPORTED_VARIANT`, `UNSUPPORTED_GPU_ARCH`, `MODEL_ASSET_MISSING`, `MODEL_CHECKSUM_MISMATCH`, `MODEL_AUTH_REQUIRED`, `INSUFFICIENT_DISK`, `PROFILE_NOT_READY`, `COMFYUI_START_FAILED`, `WORKFLOW_INVALID` |
 | Inference | `CUDA_OUT_OF_MEMORY`, `INFERENCE_FAILED`, `INFERENCE_TIMEOUT` |
 | Output | `OUTPUT_TOO_LARGE`, `OUTPUT_UPLOAD_FAILED` |
 
@@ -501,6 +501,19 @@ GPU. `FLUX2_TEXT_ENCODER=fp4` is the only setting that lowers the floor.
 - **Minimum:** 16 GB, with smaller outputs and fewer references
 - **`klein-4b-nvfp4`:** Blackwell only. On anything older the worker refuses to
   start rather than running slowly and silently.
+
+### Disk
+
+The Hub preset asks for 60 GB of container disk. The image carries roughly
+20 GB — the default profile's weights, the bf16 text encoder and the VAE, on
+top of CUDA, torch and ComfyUI — and switching profiles downloads on first
+boot without evicting what is already cached. Two bf16 profiles plus the fp4
+encoder is about 19 GB more, which is what the remaining headroom is for.
+
+If the disk does run short the worker says so before it starts downloading,
+with an `INSUFFICIENT_DISK` error naming the shortfall, rather than failing
+partway through with an errno. Attaching a network volume and setting
+`MODEL_SOURCE=volume` moves the weights off the container disk entirely.
 
 Startup checks the GPU before downloading anything and prints what it found.
 Memory warnings do not block startup: an estimate that refused to run would

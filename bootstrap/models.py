@@ -13,6 +13,7 @@ assumption instead of discovering a silent multi-gigabyte download in its bill.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import logging
 import os
@@ -35,6 +36,10 @@ VOLUME_ROOT = Path("/runpod-volume/models")
 # is free; the SHA-256 is checked only right after a download, because hashing
 # 8 GB on every cold start would cost more than it protects against.
 _MIN_SIZE_RATIO = 0.98
+
+# Hugging Face stages a download before linking it into place, so the peak
+# requirement is above the file size. Measured against a full profile switch.
+_DISK_HEADROOM = 1.15
 
 _HASH_CHUNK = 8 * 1024 * 1024
 
@@ -125,6 +130,19 @@ def _download(asset: Asset, target: Path, token: str | None) -> None:
             ErrorCode.MODEL_ASSET_MISSING,
             f"{asset.repo} does not exist or is not public",
         ) from exc
+    except OSError as exc:
+        if exc.errno != errno.ENOSPC:
+            raise WorkerError(
+                ErrorCode.MODEL_ASSET_MISSING,
+                f"could not download {asset.path} from {asset.repo} "
+                f"({type(exc).__name__})",
+            ) from exc
+        raise WorkerError(
+            ErrorCode.INSUFFICIENT_DISK,
+            f"ran out of disk while downloading {asset.filename} "
+            f"({asset.size_gb:.1f} GB). Raise the endpoint's container disk, or "
+            "attach a network volume and set MODEL_SOURCE=volume.",
+        ) from exc
     except Exception as exc:
         raise WorkerError(
             ErrorCode.MODEL_ASSET_MISSING,
@@ -137,9 +155,35 @@ def _download(asset: Asset, target: Path, token: str | None) -> None:
     target.symlink_to(path)
 
 
+def _check_disk(pending: list[Asset]) -> None:
+    """Refuse a download that cannot fit, before spending the time on it.
+
+    Hugging Face writes to a cache and then links, so the peak requirement is
+    the full set plus room to breathe. Running out mid-download leaves a
+    partial file and an errno that means nothing to whoever reads the log; a
+    profile that needs a bigger disk should say so in one line at startup.
+    """
+    if not pending:
+        return
+    needed = sum(a.size_gb for a in pending) * _DISK_HEADROOM
+    free = free_space_gb()
+    if free >= needed:
+        return
+    names = ", ".join(a.filename for a in pending)
+    raise WorkerError(
+        ErrorCode.INSUFFICIENT_DISK,
+        f"{free:.1f} GB free but about {needed:.1f} GB is needed to fetch "
+        f"{names}. Raise the endpoint's container disk, or attach a network "
+        "volume and set MODEL_SOURCE=volume.",
+    )
+
+
 def ensure_assets(config: Config) -> None:
     """Put every asset for the active profile where ComfyUI will find it."""
     source = config.model_source
+
+    if source in ("auto", "download"):
+        _check_disk([a for a in config.variant.assets if not _plausible(_target(a), a)])
 
     for asset in config.variant.assets:
         target = _target(asset)
@@ -203,7 +247,16 @@ def verify_visible(comfy: object, config: Config) -> None:
             )
 
 
-def free_space_gb(path: Path = MODELS_ROOT) -> float:
-    target = path if path.exists() else path.parent
+def free_space_gb(path: Path | None = None) -> float:
+    """Free space on the filesystem that will hold the models.
+
+    Resolved at call time rather than bound as a default argument: MODELS_ROOT
+    is patched in tests, and a frozen default would silently measure the
+    production path instead. Walks up to the first ancestor that exists,
+    because the models directory may not have been created yet.
+    """
+    target = path if path is not None else MODELS_ROOT
+    while not target.exists() and target != target.parent:
+        target = target.parent
     usage = shutil.disk_usage(os.fspath(target))
     return usage.free / 1e9
