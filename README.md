@@ -65,26 +65,28 @@ is the opposite trade.
 
 ## Samples
 
-Every image below was produced by this worker, on one RTX PRO 4500 Blackwell,
-with each profile's shipped defaults and the same prompt and seed across the
-three columns. Nothing is cherry-picked from a batch and nothing is retouched.
+Every image below was produced by this worker on one RTX PRO 4500 Blackwell,
+at each profile's shipped defaults, with the same prompt and seed in every
+cell. Nothing is cherry-picked from a batch and nothing is retouched.
+
+The layout is the two axes that separate the profiles: the row is distilled or
+base, the column is precision.
 
 ### Text to image
 
-![Text to image across the three profiles](docs/samples/bag.webp)
+![Text to image across all five profiles](docs/samples/bag.webp)
 
 ### Text rendering
 
-![Text rendering across the three profiles](docs/samples/text.webp)
+![Text rendering across all five profiles](docs/samples/text.webp)
 
 Legible signage is the capability most worth checking before trusting an image
-model with a banner. All three spell it here, at each profile's shipped
-defaults — which for the base profile means 28 steps, a value the grid search
-below picked precisely because higher counts started dropping letters.
+model with a banner. It is also the score the defaults were chosen on — see
+[How the defaults were chosen](#how-the-defaults-were-chosen).
 
 ### Image editing, one reference
 
-![A recolour edit across the three profiles](docs/samples/edit-colour.webp)
+![A recolour edit across all five profiles](docs/samples/edit-colour.webp)
 
 The prompt asked only for the colour to change. Shape, background, lighting
 direction, shadow and hardware all survive — that is the property that makes
@@ -93,7 +95,7 @@ variants of the same object.
 
 ### Two references
 
-![A two-reference composite across the three profiles](docs/samples/two-refs.webp)
+![A two-reference composite across all five profiles](docs/samples/two-refs.webp)
 
 Subject from the first reference, lettering style and palette from the second.
 References condition the generation in the order you send them, so a prompt can
@@ -102,15 +104,14 @@ address them positionally.
 ### What the set shows
 
 - **`klein-4b` is the right default.** At 4 steps it is not a preview tier; it
-  is the production output, and across the grid search it was the more
-  reliable speller of the three.
-- **`klein-4b-nvfp4` is visually near-identical to `klein-4b`** at the same
-  seed. It is the small-download option, not the fast one — see
-  [Measured](#measured).
+  is the production output.
+- **Precision is close to invisible.** fp8, bf16 and NVFP4 at the same seed
+  differ far less than the distilled/base split does. Choose precision for
+  download size, not for looks.
 - **`klein-4b-base` is a different look, not a strictly better one.** Cleaner
-  and more catalogue-like, with less material texture, and slower by more than
-  an order of magnitude. Reach for it when prompt adherence matters more than
-  throughput, not as a default upgrade.
+  and more catalogue-like, with less material texture, and several times
+  slower. Reach for it when prompt adherence matters more than throughput, not
+  as a default upgrade.
 
 A handful of seeds is not a benchmark. Treat these as a demonstration that each
 path works end to end, and run your own prompts before committing.
@@ -246,8 +247,10 @@ be measurable by this method.
 | | 1024² t2i | edit, 1 ref | edit, 2 refs | VRAM in use |
 |---|---|---|---|---|
 | `klein-4b` (4 steps) | 2.0 s | 3.5 s | 5.0 s | 12.8 GB |
+| `klein-4b-bf16` (4 steps) | 2.0 s | 3.7 s | 5.6 s | 16.5 GB |
 | `klein-4b-nvfp4` (4 steps) | 3.5 s | 6.0 s | 9.3 s | 11.2 GB |
 | `klein-4b-base` (28 steps) | 15.1 s | 32.1 s | 53.6 s | 12.8 GB |
+| `klein-4b-base-bf16` (28 steps) | 18.3 s | 38.1 s | 62.1 s | 16.5 GB |
 
 Excluding the first image of a run, which carries the model load.
 
@@ -256,9 +259,11 @@ Two things worth reading off that table:
 - **NVFP4 is the small option, not the fast one.** It is 75% slower than fp8
   here. Its 2.5 GB download shortens cold starts; its kernels do not shorten
   inference.
-- **VRAM barely moves between profiles**, because the bf16 text encoder sets
-  the floor. Only `FLUX2_TEXT_ENCODER=fp4` moves it, and it moves it by about
-  1.5 GB.
+- **The text encoder sets the floor.** Every fp8 and NVFP4 profile sits within
+  1.6 GB of the others, because 8.0 GB of what is resident is the bf16 Qwen3
+  encoder rather than the diffusion model. A bf16 diffusion model adds a real
+  3.7 GB on top; `FLUX2_TEXT_ENCODER=fp4` is the only setting that lowers the
+  floor itself.
 - **The base profile is roughly an order of magnitude slower**, and on a busy
   endpoint a two-reference edit at 54 s is a very different cost model from
   5 s. Budget for it before choosing that profile.
@@ -279,8 +284,9 @@ credential is needed on the default path.
 ### How the defaults were chosen
 
 Each profile's step count and guidance came out of a grid search on real
-hardware, not out of taste. 176 generations: every step count against every
-guidance value, three seeds per cell, on two prompts.
+hardware, not out of taste. Every step count against every guidance value,
+three seeds per cell, on two prompts, **run separately for each of the five
+profiles** rather than assumed to carry across from one to another.
 
 The score is deliberately objective. A sign prompt — *“a vintage enamel shop
 sign that reads FRESH COFFEE”* — either spells its two words or it does not,
@@ -290,50 +296,80 @@ everything else.
 
 #### Distilled profiles: 4 steps, cfg 1.0
 
-![Steps against guidance for klein-4b](docs/samples/grid-distilled.webp)
+Legible cells, out of 9 per row (3 guidance values x 3 seeds):
 
-| Steps | Legible (of 9) |
-|---|---|
-| 2 | 6 |
-| **4** | **9** |
-| 6 | 9 |
-| 8 | 9 |
+| Steps | `klein-4b` | `klein-4b-bf16` | `klein-4b-nvfp4` |
+|---|---|---|---|
+| 2 | 6 | 3 | 4 |
+| **4** | **9** | **9** | **9** |
+| 6 | 9 | 9 | 9 |
+| 8 | 9 | 9 | 9 |
 
-Two steps is not enough; four is. Six and eight spell just as well, cost
-proportionally more, and change the composition rather than refine it, so
-there is nothing to buy above four. Guidance above 1.0 warms the whole frame —
-by cfg 2.5 the brick has gone orange and the lettering glows — which is the
-distilled model being pushed outside what it was trained for. `klein-4b-nvfp4`
-scored identically and shares these values.
+Two steps is not enough at any precision; four is, at all three. Six and eight
+spell just as well, cost proportionally more, and change the composition
+rather than refine it, so there is nothing to buy above four. Guidance above
+1.0 warms the whole frame — by cfg 2.5 the brick has gone orange and the
+lettering glows — which is the distilled model being pushed outside what it
+was trained for.
+
+![Steps against guidance for klein-4b](docs/samples/grid-klein-4b.webp)
+
+<details>
+<summary>The same grid for <code>klein-4b-bf16</code> and <code>klein-4b-nvfp4</code></summary>
+
+![Steps against guidance for klein-4b-bf16](docs/samples/grid-klein-4b-bf16.webp)
+
+![Steps against guidance for klein-4b-nvfp4](docs/samples/grid-klein-4b-nvfp4.webp)
+
+</details>
 
 #### Base profiles: 28 steps, cfg 4.0
 
-![Steps against guidance for klein-4b-base](docs/samples/grid-base.webp)
+Legible cells, out of 12 per row (4 guidance values x 3 seeds):
 
-| Steps | Legible (of 12) |
-|---|---|
-| 12 | 4 |
-| 20 | 6 |
-| **28** | **7** |
-| 36 | 5 |
-| 50 | 4 |
+| Steps | `klein-4b-base` | `klein-4b-base-bf16` |
+|---|---|---|
+| 12 | 4 | 6 |
+| 20 | 6 | 7 |
+| **28** | **7** | 7 |
+| 36 | 5 | 8 |
+| 50 | 4 | 8 |
 
-The step axis has a peak and it is not at the end: past 28, spelling gets
-*worse*, and 50 steps scored no better than 12 while costing four times as
-much. The product-shot grid was effectively flat from 20 steps upward, so
-nothing else argues for going higher either. Guidance barely moved the outcome
+For the fp8 profile — the one most people will run — the step axis has a peak
+and it is not at the end: past 28 spelling gets *worse*, and 50 steps scored
+no better than 12 while costing four times as much.
+
+The bf16 profile does not fall off the same way; it is flat to slightly rising
+across the range. So the collapse at 50 belongs to the fp8 quantisation, not
+to the base model. The two profiles nonetheless share one default, because the
+bf16 gap between 28 and 50 is one cell in twelve on three seeds, which is
+noise, and it is not worth a second sampling constant.
+
+The product-shot grid was effectively flat from 20 steps upward for both, so
+nothing else argues for going higher. Guidance barely moved the outcome
 anywhere between 3.0 and 5.0 — cfg 4.0 sits in the middle of a flat region
 rather than on a peak, and 6.0 was slightly worse.
 
 This is why the shipped base default is 28 steps at cfg 4.0 where the official
 ComfyUI template says 20 at 5.0 — the only place this worker departs from the
-template, and the reason is in the grid above.
+template, and the reason is in the grids below.
 
-Worth being honest about what this measures: three seeds per cell on one
-prompt. The seed dominates everything — one of the three spelled correctly in
-all 20 base cells, another in only one — so these numbers rank settings, they
-do not predict a single request. The base profile is the weaker speller
-overall, which is not what the step counts would suggest.
+![Steps against guidance for klein-4b-base](docs/samples/grid-klein-4b-base.webp)
+
+<details>
+<summary>The same grid for <code>klein-4b-base-bf16</code></summary>
+
+![Steps against guidance for klein-4b-base-bf16](docs/samples/grid-klein-4b-base-bf16.webp)
+
+</details>
+
+#### What this does and does not measure
+
+Three seeds per cell on one prompt. The seed dominates everything — one of the
+three spelled correctly in every base cell, another in almost none — so these
+numbers rank settings against each other, they do not predict a single
+request. The base profiles are the weaker spellers overall, which is not what
+their step counts would suggest.
 
 ### Sampling steps
 
