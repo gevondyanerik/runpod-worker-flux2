@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import base64
 import io
+import threading
 from typing import Any
 
 import pytest
 from PIL import Image
 
+from app import config
 from app import handler as handler_module
 from app.errors import ErrorCode, WorkerError
 from tests.fake_comfy import FakeComfy
@@ -166,3 +168,82 @@ def test_an_uninitialised_worker_answers_instead_of_crashing() -> None:
     handler_module._COMFY = None
     response = handler_module.handler({"id": "job", "input": {"prompt": "x"}})
     assert response["error"]["code"] == "INFERENCE_FAILED"
+
+
+# ------------------------------------------------------------------- boot order
+
+
+@pytest.fixture
+def booting(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
+    """A worker mid-boot: registered with Runpod, ComfyUI not up yet."""
+    event = threading.Event()
+    monkeypatch.setattr(handler_module, "_BOOT", event)
+    monkeypatch.setattr(handler_module, "_BOOT_ERROR", None)
+    monkeypatch.setattr(handler_module, "_CONFIG", config.load())
+    monkeypatch.setattr(handler_module, "_COMFY", None)
+    return event
+
+
+def test_capabilities_answers_while_the_worker_is_still_booting(
+    booting: threading.Event,
+) -> None:
+    # The reason config is published before the boot thread starts: this must
+    # not block on ComfyUI, and Runpod's own health probing uses it.
+    response = handler_module.handler({"id": "job", "input": {"op": "capabilities"}})
+    assert response["variant"] == "klein-4b"
+    assert not booting.is_set()
+
+
+def test_a_job_waits_for_the_boot_instead_of_failing(
+    booting: threading.Event, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeComfy()
+
+    def finish() -> None:
+        handler_module.init(fake)  # type: ignore[arg-type]
+        booting.set()
+
+    threading.Timer(0.05, finish).start()
+    response = handler_module.handler({"id": "job", "input": {"prompt": "x"}})
+    assert "error" not in response
+    assert len(response["images"]) == 1
+
+
+def test_a_boot_failure_becomes_the_job_error(
+    booting: threading.Event, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A worker that cannot start must say why on every job, not crash on the
+    # way up where Runpod only sees an unresponsive runtime.
+    monkeypatch.setattr(
+        handler_module,
+        "_BOOT_ERROR",
+        WorkerError(ErrorCode.UNSUPPORTED_GPU_ARCH, "needs Blackwell"),
+    )
+    booting.set()
+    response = handler_module.handler({"id": "job", "input": {"prompt": "x"}})
+    assert response["error"]["code"] == "UNSUPPORTED_GPU_ARCH"
+
+
+def test_a_job_gives_up_on_a_boot_that_never_finishes(
+    booting: threading.Event, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(handler_module.constants, "WORKER_BOOT_TIMEOUT_S", 0.05)
+    response = handler_module.handler({"id": "job", "input": {"prompt": "x"}})
+    assert response["error"]["code"] == "COMFYUI_START_FAILED"
+
+
+def test_boot_records_a_failure_rather_than_raising(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # _boot runs on a thread nobody joins, so it must never let an exception
+    # escape: the event has to be set either way or every job hangs.
+    def boom(_: object) -> None:
+        raise RuntimeError("no GPU here")
+
+    monkeypatch.setattr(handler_module, "_BOOT_ERROR", None)
+    monkeypatch.setattr("bootstrap.preflight.check", boom)
+    ready = threading.Event()
+    handler_module._boot(config.load(), ready)
+    assert ready.is_set()
+    assert handler_module._BOOT_ERROR is not None
+    assert handler_module._BOOT_ERROR.code is ErrorCode.COMFYUI_START_FAILED

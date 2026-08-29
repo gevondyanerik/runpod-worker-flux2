@@ -34,6 +34,12 @@ COMFY_START_TIMEOUT_S: Final = 300
 COMFY_RESTART_TIMEOUT_S: Final = 180
 COMFY_HEALTH_POLL_INTERVAL_S: Final = 1.0
 
+# How long a job will wait for a worker that is still booting. Generous on
+# purpose: with a baked profile the wait is under a minute, but a worker that
+# has to download a 12 GB profile first is legitimately slow, and failing that
+# job would only send it to another worker facing the same download.
+WORKER_BOOT_TIMEOUT_S: Final = 900
+
 # worker-comfyui exposes websocket reconnect settings. This worker has no
 # websocket to reconnect: it polls /history, which cannot silently lose
 # progress, so there is nothing here to tune.

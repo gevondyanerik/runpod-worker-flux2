@@ -185,9 +185,33 @@ that says what to do, instead of being silently rejected by the platform.
 
 ## 12. Everything testable runs on a laptop
 
-The full suite is about 175 tests in roughly a second, with no GPU and no
+The full suite is about 195 tests in roughly a second, with no GPU and no
 network. `tests/fake_comfy.py` implements the ComfyUI client's surface in
 memory with failure injection, so the recovery paths — OOM, a dead process, a
 rejected graph — are tested rather than hoped for.
 
 A test suite that needs a 24 GB card is a test suite nobody runs.
+
+## 13. The worker registers with Runpod before it boots
+
+`main()` calls `runpod.serverless.start()` almost immediately and provisions
+models and starts ComfyUI on a background thread. Jobs then block until that
+thread is done, so the first request absorbs the cold start rather than the
+startup absorbing it.
+
+This is backwards from how it reads, and it is not a preference. Runpod gives a
+worker a short window to attach to its queue — measured at about three minutes
+on a Hub test pod — and a 12.5 GB profile plus a ComfyUI start does not reliably
+fit inside it. Booting first meant the platform killed the runtime with
+`prepare AI API: context deadline exceeded` before a single job was served, with
+nothing in the log to explain it, because the worker never got far enough to
+log. Runpod's own `worker-comfyui` has the same shape: ComfyUI goes to the
+background in `start.sh` and the handler waits on it per job.
+
+The cost is that a startup failure can no longer crash the process, so it is
+recorded and returned as a coded error on every job instead. That is the better
+failure anyway: `UNSUPPORTED_GPU_ARCH` in a job response says what is wrong,
+where an unresponsive runtime says nothing.
+
+`capabilities` is the exception — it is answered from configuration alone, so it
+works while the boot is still running.

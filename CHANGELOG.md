@@ -33,3 +33,7 @@ First release.
   without a failed request.
 - Runpod Hub manifests, CI covering lint, types, tests, the Docker build, and
   weekly upstream asset drift.
+- The worker attaches to Runpod's queue before provisioning models and starting
+  ComfyUI, so the first job absorbs the cold start instead of the platform
+  killing a runtime that has not finished booting. `capabilities` answers during
+  that window; a startup failure is returned as a coded error on every job.

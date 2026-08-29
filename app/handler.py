@@ -33,6 +33,12 @@ _CONFIG: config_module.Config | None = None
 _COMFY: ComfyClient | None = None
 _GPU_NAME: str | None = None
 
+# Set only when startup was handed to a background thread, which is to say only
+# under ``main()``. Tests and anything else that calls ``init()`` directly are
+# already initialised by the time they reach the handler and must not wait.
+_BOOT: threading.Event | None = None
+_BOOT_ERROR: WorkerError | None = None
+
 
 def init(comfy: ComfyClient | None = None) -> None:
     """Resolve configuration and attach a ComfyUI client.
@@ -73,16 +79,31 @@ def _detect_gpu() -> str | None:
 
 def handler(job: dict[str, Any]) -> dict[str, Any]:
     """Runpod entry point. Never raises: every failure becomes a coded error."""
+    job_id = str(job.get("id") or uuid.uuid4())
+    payload = job.get("input") or {}
+
+    # Answered without the GPU, so it works while the worker is still booting.
+    if (
+        isinstance(payload, dict)
+        and payload.get("op") == "capabilities"
+        and _CONFIG is not None
+    ):
+        return schemas.capabilities(_CONFIG, _GPU_NAME)
+
+    boot = _BOOT
+    if boot is not None and not boot.wait(constants.WORKER_BOOT_TIMEOUT_S):
+        return WorkerError(
+            ErrorCode.COMFYUI_START_FAILED,
+            f"worker was still starting after {constants.WORKER_BOOT_TIMEOUT_S}s",
+        ).to_response()
+
+    if _BOOT_ERROR is not None:
+        return _BOOT_ERROR.to_response()
+
     if _CONFIG is None or _COMFY is None:
         return WorkerError(
             ErrorCode.INFERENCE_FAILED, "worker is not initialised"
         ).to_response()
-
-    job_id = str(job.get("id") or uuid.uuid4())
-    payload = job.get("input") or {}
-
-    if isinstance(payload, dict) and payload.get("op") == "capabilities":
-        return schemas.capabilities(_CONFIG, _GPU_NAME)
 
     started = time.monotonic()
     try:
@@ -199,32 +220,75 @@ def _generate(payload: dict[str, Any], job_id: str, started: float) -> dict[str,
     return response
 
 
-def main() -> None:
-    """Boot the worker: check hardware, provision models, start ComfyUI, serve.
+def _boot(config: config_module.Config, ready: threading.Event) -> None:
+    """Check hardware, provision models, start ComfyUI.
 
     The order is deliberate. Hardware first, because an unsupported GPU should
     fail before a multi-gigabyte download. Models next, because ComfyUI indexes
     its model directories at startup and will not see a file that arrives
     later.
+
+    Failure is recorded rather than raised. This runs on a thread that nothing
+    joins, so an exception here would vanish and leave the worker accepting
+    jobs it cannot serve; instead the first job returns the coded reason.
     """
-    import runpod
+    global _BOOT_ERROR
 
     from bootstrap import models as model_bootstrap
     from bootstrap import preflight
+
+    try:
+        preflight.check(config)
+        model_bootstrap.ensure_assets(config)
+
+        comfy = ComfyClient()
+        comfy.start()
+        model_bootstrap.verify_visible(comfy, config)
+
+        init(comfy)
+        log.info("worker ready")
+    except WorkerError as error:
+        _BOOT_ERROR = error
+        log.error("worker failed to start", extra={"code": str(error.code)})
+    except Exception as exc:  # pragma: no cover - defensive
+        _BOOT_ERROR = WorkerError(
+            ErrorCode.COMFYUI_START_FAILED,
+            f"worker failed to start ({type(exc).__name__}): {exc}",
+        )
+        log.exception("worker failed to start")
+    finally:
+        ready.set()
+
+
+def main() -> None:
+    """Attach to Runpod's queue, then boot in the background.
+
+    Registration comes first, and that ordering is load-bearing. Runpod gives a
+    worker a short window to attach before it declares the runtime dead, and
+    provisioning models and starting ComfyUI does not fit inside it — a worker
+    that finished booting before registering was killed as unresponsive with
+    ``prepare AI API: context deadline exceeded`` and never served a request.
+
+    So the slow half runs on a thread and the first job waits for it. This is
+    what Runpod's own worker-comfyui does: ComfyUI goes to the background and
+    the handler blocks on it per job rather than at startup.
+    """
+    global _BOOT, _CONFIG
+
+    import runpod
 
     logging_setup.configure()
     config = config_module.load()
     log.info("worker starting", extra=config_module.describe(config))
 
-    preflight.check(config)
-    model_bootstrap.ensure_assets(config)
+    # Published early so ``capabilities`` can be answered during the boot.
+    _CONFIG = config
 
-    comfy = ComfyClient()
-    comfy.start()
-    model_bootstrap.verify_visible(comfy, config)
+    _BOOT = threading.Event()
+    threading.Thread(
+        target=_boot, args=(config, _BOOT), name="boot", daemon=True
+    ).start()
 
-    init(comfy)
-    log.info("worker ready")
     runpod.serverless.start({"handler": handler})
 
 
