@@ -310,6 +310,16 @@ docker build -t flux2-worker --build-arg BAKE_TEXT_ENCODER=fp4 .
 `BAKE_VARIANT` also writes `FLUX2_BAKED_VARIANT` into the image, so a privately
 rebuilt image still starts correctly with an empty environment.
 
+Each release also publishes a prebuilt image with the default profile's weights
+already in it:
+
+```
+ghcr.io/gevondyanerik/runpod-worker-flux2:latest
+```
+
+The Hub builds its own image from this Dockerfile, so that tag is for people
+deploying the worker outside the Hub.
+
 Base image, ComfyUI revision and torch build are all pinned. "Whatever was
 latest when this layer was rebuilt" is not a reproducible deployment.
 

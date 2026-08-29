@@ -69,6 +69,10 @@ jobs:
 
       # Without the weights: a pull request should not pull 12 GB of
       # checkpoints to prove the image builds.
+      #
+      # No layer cache on purpose. Even weightless this image is well over the
+      # 10 GB Actions cache limit, so a cache would evict itself every run and
+      # cost several minutes to export for nothing.
       - name: Build (no weights)
         uses: docker/build-push-action@v6
         with:
@@ -78,8 +82,6 @@ jobs:
           load: true
           tags: runpod-worker-flux2:ci
           build-args: BAKE_WEIGHTS=0
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: The worker imports inside the image
         run: |
@@ -112,6 +114,17 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      # A GitHub runner ships with about 14 GB free. The image with weights
+      # baked in is roughly 26 GB, so the space has to be made before the
+      # build rather than discovered halfway through it.
+      - name: Reclaim runner disk
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          sudo docker image prune --all --force
+          df -h /
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -137,3 +150,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: BAKE_WEIGHTS=1
+          provenance: false
