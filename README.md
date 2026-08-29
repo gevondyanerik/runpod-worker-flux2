@@ -1,5 +1,9 @@
 # runpod-worker-flux2
 
+[![Runpod](https://api.runpod.io/badge/gevondyanerik/runpod-worker-flux2)](https://console.runpod.io/hub/gevondyanerik/runpod-worker-flux2)
+[![CI](https://github.com/gevondyanerik/runpod-worker-flux2/actions/workflows/ci.yml/badge.svg)](https://github.com/gevondyanerik/runpod-worker-flux2/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 A [Runpod Serverless](https://docs.runpod.io/serverless/overview) worker for
 **FLUX.2 klein 4B** — text-to-image and multi-reference image editing, built on
 ComfyUI but with ComfyUI kept entirely out of the API.
@@ -319,7 +323,7 @@ Everything except the Docker build runs on a laptop with no GPU and no network.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-pytest tests -q                  # ~160 tests, about a second
+pytest tests -q                  # ~175 tests, about a second
 ruff check . && ruff format --check .
 mypy app bootstrap
 

@@ -222,12 +222,22 @@ class ComfyClient:
             history = self._history(prompt_id)
             if history:
                 status = history.get("status", {})
-                failed = status.get("status_str") == "error"
-                if failed or status.get("completed") is False:
+                if status.get("status_str") == "error":
                     self._raise_execution_error(status)
+
                 outputs = history.get("outputs") or {}
                 if outputs:
                     return self._collect(outputs)
+
+                # Finished, but with nothing to show. Only conclusive once the
+                # entry says it completed: an entry that is merely present may
+                # still be executing, and treating that as a failure would kill
+                # every slow job.
+                if status.get("completed") is True:
+                    raise WorkerError(
+                        ErrorCode.INFERENCE_FAILED,
+                        "the workflow completed without producing an image",
+                    )
             if self._process is not None and self._process.poll() is not None:
                 raise WorkerError(
                     ErrorCode.INFERENCE_FAILED, "ComfyUI died while executing the job"

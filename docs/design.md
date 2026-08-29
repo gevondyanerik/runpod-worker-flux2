@@ -175,7 +175,7 @@ that says what to do, instead of being silently rejected by the platform.
 
 ## 12. Everything testable runs on a laptop
 
-The full suite is about 160 tests in roughly a second, with no GPU and no
+The full suite is about 175 tests in roughly a second, with no GPU and no
 network. `tests/fake_comfy.py` implements the ComfyUI client's surface in
 memory with failure injection, so the recovery paths — OOM, a dead process, a
 rejected graph — are tested rather than hoped for.
