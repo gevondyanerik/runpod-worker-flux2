@@ -1,0 +1,20 @@
+name: Weekly drift check
+
+# The pinned model files live in someone else's repositories. A rename, a
+# replaced file or a revoked revision breaks a cold start in front of a paying
+# request; finding out on a schedule is much cheaper.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  assets:
+    name: Pinned model files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/check_assets.py

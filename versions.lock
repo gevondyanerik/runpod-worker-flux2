@@ -1,0 +1,42 @@
+# Pinned upstream versions.
+#
+# Not machine-read: the authoritative pins live in the Dockerfile and in
+# app/variants.py. This file exists so a reader can see everything this worker
+# depends on, and when each pin was last verified, without reading three files.
+#
+# Last verified: 2026-08-29
+
+[base]
+image                    nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+python                   3.12 (Ubuntu 24.04 system interpreter)
+
+[torch]
+index                    https://download.pytorch.org/whl/cu128
+torch                    2.11.0
+torchvision              0.26.0
+torchaudio               2.11.0
+
+[comfyui]
+ref                      v0.34.0
+commit                   12d5279438bfefc058a269eae805ceab6047777f
+released                 2026-08-25
+# Nodes this worker depends on, all present at that revision:
+#   UNETLoader, CLIPLoader(type=flux2), VAELoader, CLIPTextEncode,
+#   ConditioningZeroOut, EmptyFlux2LatentImage, Flux2Scheduler, KSamplerSelect,
+#   RandomNoise, CFGGuider, SamplerCustomAdvanced, VAEDecode, VAEEncode,
+#   SaveImage, LoadImage, ImageScaleToTotalPixels, ReferenceLatent, GetImageSize
+
+[worker]
+runpod                   >=1.12.0,<2
+pydantic                 >=2.13,<3
+Pillow                   >=12.0,<13
+urllib3                  >=2.7,<3
+huggingface_hub          >=1.29,<2
+
+[models]
+# Full pins, including SHA-256, live in app/variants.py and are checked weekly
+# by scripts/check_assets.py.
+black-forest-labs/FLUX.2-klein-4b-fp8        5b4408e59397a4a37ccb46afe426d8ed86379441
+black-forest-labs/FLUX.2-klein-4b-nvfp4      1db2b2f776c24b76f1122e5f69ab1949fc620068
+black-forest-labs/FLUX.2-klein-base-4b-fp8   103db268c10d4d3921101b46057671f9ac460da6
+Comfy-Org/vae-text-encorder-for-flux-klein-4b 5f526678002e43af5551dadb73ce2e8c91b43afe

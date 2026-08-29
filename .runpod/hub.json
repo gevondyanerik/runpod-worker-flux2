@@ -1,0 +1,297 @@
+{
+  "title": "FLUX.2 klein",
+  "description": "Text-to-image and multi-reference image editing with FLUX.2 klein 4B. Apache-2.0 weights, no API keys, and a working endpoint with nothing configured.",
+  "type": "serverless",
+  "category": "image",
+  "config": {
+    "runsOn": "GPU",
+    "containerDiskInGb": 40,
+    "gpuCount": 1,
+    "gpuIds": "AMPERE_24,ADA_24,AMPERE_48,ADA_48_PRO,AMPERE_80,ADA_80_PRO",
+    "allowedCudaVersions": ["12.8", "12.9", "13.0"],
+    "presets": [
+      {
+        "name": "Fast (default)",
+        "defaults": {
+          "FLUX2_VARIANT": "klein-4b"
+        }
+      },
+      {
+        "name": "Quality",
+        "defaults": {
+          "FLUX2_VARIANT": "klein-4b-base"
+        }
+      },
+      {
+        "name": "Smallest download",
+        "defaults": {
+          "FLUX2_VARIANT": "klein-4b-nvfp4",
+          "FLUX2_TEXT_ENCODER": "fp4"
+        }
+      }
+    ],
+    "env": [
+      {
+        "key": "FLUX2_VARIANT",
+        "input": {
+          "name": "Model",
+          "type": "string",
+          "description": "Which FLUX.2 klein 4B profile to serve. Everything else — sampler, steps, guidance, text encoder, VAE — follows from this choice. Only the default is baked into the image; the others download once on first boot.",
+          "options": [
+            {
+              "label": "klein 4B distilled, fp8 — fast, baked in (default)",
+              "value": "klein-4b"
+            },
+            {
+              "label": "klein 4B distilled, bf16 — full precision, 7.8 GB download",
+              "value": "klein-4b-bf16"
+            },
+            {
+              "label": "klein 4B distilled, NVFP4 — Blackwell GPUs only",
+              "value": "klein-4b-nvfp4"
+            },
+            {
+              "label": "klein 4B base, fp8 — slower, better prompt adherence",
+              "value": "klein-4b-base"
+            },
+            {
+              "label": "klein 4B base, bf16 — quality ceiling, 7.8 GB download",
+              "value": "klein-4b-base-bf16"
+            }
+          ],
+          "default": "klein-4b",
+          "advanced": false
+        }
+      },
+      {
+        "key": "FLUX2_TEXT_ENCODER",
+        "input": {
+          "name": "Text encoder precision",
+          "type": "string",
+          "description": "Qwen3-4B in bf16 (8.0 GB, baked in) or fp4 (3.8 GB, downloads once). The encoder sets the memory floor for every profile, so fp4 is the only lever that lowers it.",
+          "options": [
+            { "label": "bf16 — baked into the image", "value": "bf16" },
+            { "label": "fp4 — smaller, lower memory floor", "value": "fp4" }
+          ],
+          "default": "bf16",
+          "advanced": true
+        }
+      },
+      {
+        "key": "MODEL_SOURCE",
+        "input": {
+          "name": "Where weights come from",
+          "type": "string",
+          "description": "auto tries the image, then a network volume, then Hugging Face. The explicit values turn that fallback off, so a production deployment can assert its assumption instead of discovering a multi-gigabyte download in its bill.",
+          "options": [
+            { "label": "auto — image, then volume, then download", "value": "auto" },
+            { "label": "baked — fail if not in the image", "value": "baked" },
+            { "label": "volume — fail if not on the network volume", "value": "volume" },
+            { "label": "download — always fetch from Hugging Face", "value": "download" }
+          ],
+          "default": "auto",
+          "advanced": true
+        }
+      },
+      {
+        "key": "DEFAULT_WIDTH",
+        "input": {
+          "name": "Default width",
+          "type": "number",
+          "description": "Used when a request does not specify one.",
+          "min": 256,
+          "max": 4096,
+          "default": 1024,
+          "advanced": true
+        }
+      },
+      {
+        "key": "DEFAULT_HEIGHT",
+        "input": {
+          "name": "Default height",
+          "type": "number",
+          "description": "Used when a request does not specify one.",
+          "min": 256,
+          "max": 4096,
+          "default": 1024,
+          "advanced": true
+        }
+      },
+      {
+        "key": "MAX_PIXELS",
+        "input": {
+          "name": "Maximum output pixels",
+          "type": "number",
+          "description": "Ceiling on width x height. Lower it to keep a shared endpoint predictable.",
+          "min": 65536,
+          "max": 4194304,
+          "default": 4194304,
+          "advanced": true
+        }
+      },
+      {
+        "key": "MAX_IMAGES_PER_REQUEST",
+        "input": {
+          "name": "Maximum images per request",
+          "type": "number",
+          "description": "Upper bound on the n field.",
+          "min": 1,
+          "max": 8,
+          "default": 4,
+          "advanced": true
+        }
+      },
+      {
+        "key": "MAX_INPUT_IMAGES",
+        "input": {
+          "name": "Maximum reference images",
+          "type": "number",
+          "description": "Can lower the profile's own limit, never raise it.",
+          "min": 0,
+          "max": 10,
+          "default": 6,
+          "advanced": true
+        }
+      },
+      {
+        "key": "REF_MAX_PIXELS",
+        "input": {
+          "name": "Reference image pixel budget",
+          "type": "number",
+          "description": "Each reference is downscaled to fit this before encoding. References enter the transformer context, so this drives both memory and latency.",
+          "min": 262144,
+          "max": 4194304,
+          "default": 1048576,
+          "advanced": true
+        }
+      },
+      {
+        "key": "DEFAULT_OUTPUT_FORMAT",
+        "input": {
+          "name": "Default output format",
+          "type": "string",
+          "description": "Per-request output_format overrides this.",
+          "options": [
+            { "label": "WebP — smallest", "value": "webp" },
+            { "label": "PNG — lossless", "value": "png" },
+            { "label": "JPEG", "value": "jpeg" }
+          ],
+          "default": "webp",
+          "advanced": true
+        }
+      },
+      {
+        "key": "DEFAULT_OUTPUT_QUALITY",
+        "input": {
+          "name": "Default output quality",
+          "type": "number",
+          "description": "Applies to WebP and JPEG.",
+          "min": 1,
+          "max": 100,
+          "default": 95,
+          "advanced": true
+        }
+      },
+      {
+        "key": "BUCKET_ENDPOINT_URL",
+        "input": {
+          "name": "S3 endpoint URL",
+          "type": "string",
+          "description": "Optional. Leave empty to get images back as base64, which is a fully supported production setup. Set all three S3 fields together or none of them.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "BUCKET_ACCESS_KEY_ID",
+        "input": {
+          "name": "S3 access key ID",
+          "type": "string",
+          "description": "Optional. Only needed if you set an S3 endpoint.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "BUCKET_SECRET_ACCESS_KEY",
+        "input": {
+          "name": "S3 secret access key",
+          "type": "string",
+          "description": "Optional. Only needed if you set an S3 endpoint.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "HF_TOKEN",
+        "input": {
+          "name": "Hugging Face token",
+          "type": "string",
+          "description": "Not needed for any built-in profile — every model this worker ships is public and Apache-2.0. Only relevant if you point the expert overrides below at a gated repository.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "DIFFUSION_MODEL_REPO",
+        "input": {
+          "name": "Custom diffusion model repo",
+          "type": "string",
+          "description": "Expert override. Set together with the file field. You are responsible for the licence and the compatibility of anything you point this at.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "DIFFUSION_MODEL_FILE",
+        "input": {
+          "name": "Custom diffusion model file",
+          "type": "string",
+          "description": "Path inside the repository. Must be .safetensors; there is no GGUF loader in this image.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "TEXT_ENCODER_REPO",
+        "input": {
+          "name": "Custom text encoder repo",
+          "type": "string",
+          "description": "Expert override. Set together with the file field.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "TEXT_ENCODER_FILE",
+        "input": {
+          "name": "Custom text encoder file",
+          "type": "string",
+          "description": "Path inside the repository.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "VAE_REPO",
+        "input": {
+          "name": "Custom VAE repo",
+          "type": "string",
+          "description": "Expert override. Set together with the file field.",
+          "default": "",
+          "advanced": true
+        }
+      },
+      {
+        "key": "VAE_FILE",
+        "input": {
+          "name": "Custom VAE file",
+          "type": "string",
+          "description": "Path inside the repository.",
+          "default": "",
+          "advanced": true
+        }
+      }
+    ]
+  }
+}

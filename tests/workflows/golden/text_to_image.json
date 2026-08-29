@@ -1,0 +1,175 @@
+{
+  "clip": {
+    "_meta": {
+      "title": "FLUX2_TE_LOADER"
+    },
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "device": "default",
+      "type": "flux2"
+    }
+  },
+  "decode": {
+    "_meta": {
+      "title": "FLUX2_DECODE"
+    },
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "sample",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "guider": {
+    "_meta": {
+      "title": "FLUX2_GUIDER"
+    },
+    "class_type": "CFGGuider",
+    "inputs": {
+      "cfg": 1.0,
+      "model": [
+        "unet",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "positive": [
+        "prompt",
+        0
+      ]
+    }
+  },
+  "latent": {
+    "_meta": {
+      "title": "FLUX2_LATENT"
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "batch_size": 1,
+      "height": 1024,
+      "width": 1024
+    }
+  },
+  "negative": {
+    "_meta": {
+      "title": "FLUX2_NEGATIVE"
+    },
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "prompt",
+        0
+      ]
+    }
+  },
+  "noise": {
+    "_meta": {
+      "title": "FLUX2_NOISE"
+    },
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 42
+    }
+  },
+  "prompt": {
+    "_meta": {
+      "title": "FLUX2_PROMPT"
+    },
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "clip",
+        0
+      ],
+      "text": "a red bicycle leaning on a wall"
+    }
+  },
+  "sample": {
+    "_meta": {
+      "title": "FLUX2_SAMPLE"
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "guider": [
+        "guider",
+        0
+      ],
+      "latent_image": [
+        "latent",
+        0
+      ],
+      "noise": [
+        "noise",
+        0
+      ],
+      "sampler": [
+        "sampler",
+        0
+      ],
+      "sigmas": [
+        "sigmas",
+        0
+      ]
+    }
+  },
+  "sampler": {
+    "_meta": {
+      "title": "FLUX2_SAMPLER"
+    },
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "save": {
+    "_meta": {
+      "title": "FLUX2_OUTPUT"
+    },
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "flux2",
+      "images": [
+        "decode",
+        0
+      ]
+    }
+  },
+  "sigmas": {
+    "_meta": {
+      "title": "FLUX2_SCHEDULER"
+    },
+    "class_type": "Flux2Scheduler",
+    "inputs": {
+      "height": 1024,
+      "steps": 4,
+      "width": 1024
+    }
+  },
+  "unet": {
+    "_meta": {
+      "title": "FLUX2_DIFFUSION_LOADER"
+    },
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux-2-klein-4b-fp8.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "vae": {
+    "_meta": {
+      "title": "FLUX2_VAE_LOADER"
+    },
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    }
+  }
+}

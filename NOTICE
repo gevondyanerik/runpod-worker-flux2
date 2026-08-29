@@ -1,0 +1,38 @@
+runpod-worker-flux2
+Copyright 2026 Erik Gevondyan
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+--------------------------------------------------------------------------------
+Third-party components
+--------------------------------------------------------------------------------
+
+This project builds a container image that includes, but does not modify or
+statically link against, the following:
+
+ComfyUI — https://github.com/comfyanonymous/ComfyUI
+    GPL-3.0-or-later. Run as a separate process over a loopback HTTP API; this
+    worker links against none of its code.
+
+FLUX.2 klein 4B model weights — https://huggingface.co/black-forest-labs
+    Apache-2.0. Includes the fp8, bf16 and NVFP4 distributions of both the
+    distilled and base 4B models.
+
+Qwen3-4B text encoder, FLUX.2 VAE
+    Apache-2.0. Repackaged for ComfyUI by Comfy-Org.
+
+PyTorch, Pillow, pydantic, urllib3, huggingface_hub, runpod
+    See each project for its own licence.
+
+FLUX.2-dev and the FLUX.2 klein 9B family are NOT included. They are released
+under the FLUX Non-Commercial License and are deliberately outside the scope of
+this project.

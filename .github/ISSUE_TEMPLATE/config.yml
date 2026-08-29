@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/gevondyanerik/runpod-worker-flux2/security/advisories/new
+    about: Report privately, not as a public issue.
+  - name: Runpod Serverless documentation
+    url: https://docs.runpod.io/serverless/overview
+    about: Questions about endpoints, scaling and billing.

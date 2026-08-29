@@ -1,0 +1,9 @@
+# Runtime dependencies of the worker itself.
+#
+# ComfyUI's own requirements are installed separately in the Dockerfile, from
+# the pinned ComfyUI checkout, so the two sets never drift into each other.
+runpod>=1.12.0,<2
+pydantic>=2.13,<3
+Pillow>=12.0,<13
+urllib3>=2.7,<3
+huggingface_hub>=1.29,<2

@@ -1,0 +1,44 @@
+{
+  "tests": [
+    {
+      "name": "text_to_image_zero_config",
+      "input": {
+        "prompt": "a red bicycle leaning against a white wall, soft daylight",
+        "width": 512,
+        "height": 512,
+        "seed": 42
+      },
+      "timeout": 600000
+    },
+    {
+      "name": "image_edit_with_reference",
+      "input": {
+        "prompt": "change the bag colour to deep blue, keep everything else",
+        "images": [
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAADQklEQVR42u3cvXEiQRSF0R4V+ZAKBjYBkIMs5UAAsjGUCnmMNVXjKwEV4meYbvqeY28Jbet98xpWtcM8jQVSfTgCBAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAAQAAgABAACAAGAAEAAIAD428YRrOzrsLv+Bz6/f5zSaoZ5Gp1C3YnXgwDMvRIEYPRlIACjLwMBGH0ZFB+Dmv5GX9cGoK0RtApsgOgHsFUggPSZ04Ar0HtM27/XlZd+cQRQZ/ofGM3VXkgAvGooFxnHKi8qAJ4axMWnsO6rC8D071oYvka+jeJTINNfZexu//o+FxJAnw9dDbgCNTf9Ve4bLX9vNkCQWhNmsgVQ/xFbdwpveXUXIQH0Of0aEAAIIPjxbwkIwK/ge0MsAL9aXPyzgACyH7eWgADS50wDAnBPcAsSQPAj1hIQgAekJSAAEEDm7cItSAAgAJdjbwMEkHmvcAsSAAgABAACeOp94Tteqa9/z94HCwAEgABAACAAEAAU/zco2AAgAOjXJuTveTnu/bDvtT2dvQcw9/RcQrcBGH0Z5L4HMP1ONXQDGH2rIHcDmH7n7AoEkQF4/Dvt3ABMvzN3BYLIADz+nbwNAAKAtADcf5y/DQACAAGAAEAAIAAQAAgABAACAAGAAEAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAIAAYAAQAAgABAACAAEAAJAACAAEAAIAAQAAgABgABAACAAEAAIAAQAAgABgABAACAAEAAIAAQAAgABLG57OvspOn8bAAQAgQG4BTl5GwCCA7AEnHn6BtCA03YFguAALAHnfK9hnsb+fkKX496YGv3cK5BV4FSjN4BVYPQFoARzLwDwMSgIAAQAAgABgAAQgCNAACAAEAAIAAQAAgABgABAACAAEAAIAAQAAgABgABAACAAEAAIAAQAAgABgABAACAAEAAIAAQAAgABgABAACAAEAAIAAQAAgABwMN+AWBI/T+QKkIXAAAAAElFTkSuQmCC"
+        ],
+        "width": 512,
+        "height": 512,
+        "seed": 7
+      },
+      "timeout": 300000
+    },
+    {
+      "name": "capabilities",
+      "input": {
+        "op": "capabilities"
+      },
+      "timeout": 300000
+    }
+  ],
+  "config": {
+    "gpuTypeId": "NVIDIA GeForce RTX 4090",
+    "gpuCount": 1,
+    "env": [],
+    "allowedCudaVersions": [
+      "12.8",
+      "12.9",
+      "13.0"
+    ]
+  }
+}

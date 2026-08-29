@@ -1,0 +1,35 @@
+name: Feature request
+description: Something the worker should do and does not
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This worker is deliberately opinionated. Two requests are usually
+        declined, and CONTRIBUTING.md explains why:
+
+        - **A new environment variable.** It needs to be both underivable and
+          non-essential to the default path.
+        - **Exposing sampler, scheduler, model paths or workflow JSON in a
+          request.** Those are properties of the deployment, not of a call.
+
+        A concrete use case that neither of those covers is very welcome.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The problem, not the solution you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do today
+      description: How you work around it now, and why that is not enough.
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like

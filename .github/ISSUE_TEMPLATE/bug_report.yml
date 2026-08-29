@@ -1,0 +1,58 @@
+name: Bug report
+description: Something the worker does that it should not
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: if the worker will not start, run
+        `python scripts/diagnose.py` inside the container. It prints the
+        resolved configuration, the hardware and where the model files
+        actually are, which explains most startup failures on its own.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: request
+    attributes:
+      label: The request
+      description: The `input` payload, with prompts redacted if you need to.
+      render: json
+
+  - type: textarea
+    id: response
+    attributes:
+      label: The error
+      description: The full error object, including its `code`.
+      render: json
+
+  - type: input
+    id: variant
+    attributes:
+      label: FLUX2_VARIANT
+      placeholder: klein-4b (or "unset")
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU
+      placeholder: RTX 4090
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment variables you set
+      description: Names and values, with secrets removed. "None" is a useful answer.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Worker logs
+      description: The startup lines and anything around the failure.
+      render: shell

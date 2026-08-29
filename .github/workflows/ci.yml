@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  checks:
+    name: Lint, types and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Ruff
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Types
+        run: mypy app bootstrap
+
+      # The configuration surface is a design promise, not a convention, so it
+      # is enforced rather than documented.
+      - name: Only app/config.py reads the environment
+        run: python scripts/audit_config.py
+
+      - name: .env.example and hub.json match app/config.py
+        run: python scripts/audit_env.py
+
+      - name: Hub manifests are valid JSON
+        run: |
+          python -c "import json; json.load(open('.runpod/hub.json'))"
+          python -c "import json; json.load(open('.runpod/tests.json'))"
+
+      - name: Tests
+        run: pytest tests -q
+
+      # A regenerated graph that nobody looked at is exactly what the golden
+      # files exist to catch, so a stale one fails here too.
+      - name: Golden graphs are up to date
+        run: |
+          python scripts/update_goldens.py
+          git diff --exit-code tests/workflows/golden
+
+  image:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Without the weights: a pull request should not pull 12 GB of
+      # checkpoints to prove the image builds.
+      - name: Build (no weights)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: runpod-worker-flux2:ci
+          build-args: BAKE_WEIGHTS=0
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: The worker imports inside the image
+        run: |
+          docker run --rm runpod-worker-flux2:ci \
+            python3 -c "import handler; print('handler ok')"
+
+      - name: Diagnostics run inside the image
+        run: docker run --rm runpod-worker-flux2:ci python3 /worker/scripts/diagnose.py
+
+  assets:
+    name: Pinned model files still exist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python scripts/check_assets.py
+
+  publish:
+    name: Publish image
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [checks, image, assets]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      # The published image carries the weights: a Hub deployment must start
+      # without downloading anything.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: BAKE_WEIGHTS=1
