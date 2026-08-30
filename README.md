@@ -471,8 +471,21 @@ Failures return a stable code, a readable message and an honest `retryable`
 flag — never a stack trace.
 
 ```json
-{"error": {"code": "INVALID_RESOLUTION", "message": "…", "retryable": false}}
+{
+  "output": {
+    "code": "INVALID_RESOLUTION",
+    "message": "…",
+    "retryable": false
+  },
+  "error": "INVALID_RESOLUTION: …"
+}
 ```
+
+Read the code from `output.code`. The flat `error` string beside it is there
+for Runpod's own job reporting: the platform's SDK lifts a top-level `error`
+out of the handler's return value and keeps it only when it is a string, so
+anything structured put there is discarded along with the rest of the output.
+The fields that matter therefore live where the platform does not touch them.
 
 `retryable` is not inferable from the code alone, which is why it is on the
 wire: retry `IMAGE_DOWNLOAD_FAILED`, do not retry `INVALID_RESOLUTION`.

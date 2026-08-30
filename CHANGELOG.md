@@ -37,3 +37,7 @@ First release.
   ComfyUI, so the first job absorbs the cold start instead of the platform
   killing a runtime that has not finished booting. `capabilities` answers during
   that window; a startup failure is returned as a coded error on every job.
+- Errors return their code, message and `retryable` flag at the top level of
+  `output`, with a plain-string `error` beside them. Runpod's SDK pops a
+  top-level `error` and drops `output` when that empties it, so the previous
+  nested shape reached callers as a job with neither.

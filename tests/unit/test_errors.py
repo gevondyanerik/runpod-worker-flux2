@@ -10,17 +10,29 @@ from app.errors import RETRYABLE, ErrorCode, WorkerError
 def test_response_shape_is_stable() -> None:
     response = WorkerError(ErrorCode.INVALID_INPUT, "bad width").to_response()
     assert response == {
-        "error": {
-            "code": "INVALID_INPUT",
-            "message": "bad width",
-            "retryable": False,
-        }
+        "error": "INVALID_INPUT: bad width",
+        "code": "INVALID_INPUT",
+        "message": "bad width",
+        "retryable": False,
     }
+
+
+def test_the_structure_survives_runpods_error_key() -> None:
+    # Runpod's SDK pops a top-level "error" and then discards "output" if the
+    # pop emptied it (rp_job.py). Reproduced here rather than described, because
+    # this contract was already broken once in production while every other test
+    # in this file passed.
+    response = WorkerError(ErrorCode.INVALID_INPUT, "bad width").to_response()
+
+    popped = response.pop("error")
+    assert isinstance(popped, str), "Runpod keeps this field only when it is a string"
+    assert response != {}, "what remains is what the caller receives as output"
+    assert response["code"] == "INVALID_INPUT"
 
 
 def test_details_are_included_when_present() -> None:
     error = WorkerError(ErrorCode.TOO_MANY_IMAGES, "too many", details={"max": 6})
-    assert error.to_response()["error"]["details"] == {"max": 6}
+    assert error.to_response()["details"] == {"max": 6}
 
 
 @pytest.mark.parametrize(

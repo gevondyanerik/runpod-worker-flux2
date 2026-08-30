@@ -115,14 +115,14 @@ def test_capabilities_needs_no_gpu(comfy: FakeComfy) -> None:
 
 def test_a_validation_error_never_reaches_comfyui(comfy: FakeComfy) -> None:
     response = run({})
-    assert response["error"]["code"] == "MISSING_PROMPT"
-    assert response["error"]["retryable"] is False
+    assert response["code"] == "MISSING_PROMPT"
+    assert response["retryable"] is False
     assert comfy.submitted == []
 
 
 def test_an_unknown_field_is_refused(comfy: FakeComfy) -> None:
     response = run({"prompt": "x", "sampler": "dpmpp_2m"})
-    assert response["error"]["code"] == "INVALID_INPUT"
+    assert response["code"] == "INVALID_INPUT"
 
 
 def test_out_of_memory_is_reported_and_recovered(comfy: FakeComfy) -> None:
@@ -130,8 +130,8 @@ def test_out_of_memory_is_reported_and_recovered(comfy: FakeComfy) -> None:
         ErrorCode.CUDA_OUT_OF_MEMORY, "the GPU ran out of memory"
     )
     response = run({"prompt": "x"})
-    assert response["error"]["code"] == "CUDA_OUT_OF_MEMORY"
-    assert response["error"]["retryable"] is True
+    assert response["code"] == "CUDA_OUT_OF_MEMORY"
+    assert response["retryable"] is True
     # A worker whose GPU is in an unknown state must not just carry on.
     assert comfy.restarts == 1
     assert comfy.freed == 1
@@ -140,7 +140,7 @@ def test_out_of_memory_is_reported_and_recovered(comfy: FakeComfy) -> None:
 def test_a_rejected_graph_surfaces_as_workflow_invalid(comfy: FakeComfy) -> None:
     comfy.raise_on_submit = WorkerError(ErrorCode.WORKFLOW_INVALID, "bad node")
     response = run({"prompt": "x"})
-    assert response["error"]["code"] == "WORKFLOW_INVALID"
+    assert response["code"] == "WORKFLOW_INVALID"
 
 
 def test_an_unexpected_exception_becomes_a_coded_error(
@@ -153,13 +153,13 @@ def test_an_unexpected_exception_becomes_a_coded_error(
 
     monkeypatch.setattr(handler_module.schemas, "parse", boom)
     response = run({"prompt": "x"})
-    assert response["error"]["code"] == "INFERENCE_FAILED"
+    assert response["code"] == "INFERENCE_FAILED"
     assert "traceback" not in str(response).lower()
 
 
 def test_a_bad_reference_url_fails_before_the_gpu(comfy: FakeComfy) -> None:
     response = run({"prompt": "x", "images": ["file:///etc/passwd"]})
-    assert response["error"]["code"] == "INVALID_IMAGE_URL"
+    assert response["code"] == "INVALID_IMAGE_URL"
     assert comfy.submitted == []
 
 
@@ -167,7 +167,7 @@ def test_an_uninitialised_worker_answers_instead_of_crashing() -> None:
     handler_module._CONFIG = None
     handler_module._COMFY = None
     response = handler_module.handler({"id": "job", "input": {"prompt": "x"}})
-    assert response["error"]["code"] == "INFERENCE_FAILED"
+    assert response["code"] == "INFERENCE_FAILED"
 
 
 # ------------------------------------------------------------------- boot order
@@ -221,7 +221,7 @@ def test_a_boot_failure_becomes_the_job_error(
     )
     booting.set()
     response = handler_module.handler({"id": "job", "input": {"prompt": "x"}})
-    assert response["error"]["code"] == "UNSUPPORTED_GPU_ARCH"
+    assert response["code"] == "UNSUPPORTED_GPU_ARCH"
 
 
 def test_a_job_gives_up_on_a_boot_that_never_finishes(
@@ -229,7 +229,7 @@ def test_a_job_gives_up_on_a_boot_that_never_finishes(
 ) -> None:
     monkeypatch.setattr(handler_module.constants, "WORKER_BOOT_TIMEOUT_S", 0.05)
     response = handler_module.handler({"id": "job", "input": {"prompt": "x"}})
-    assert response["error"]["code"] == "COMFYUI_START_FAILED"
+    assert response["code"] == "COMFYUI_START_FAILED"
 
 
 def test_boot_records_a_failure_rather_than_raising(

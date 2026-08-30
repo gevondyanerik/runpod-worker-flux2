@@ -84,11 +84,26 @@ class WorkerError(Exception):
         return self.code in RETRYABLE
 
     def to_response(self) -> dict[str, Any]:
-        error: dict[str, Any] = {
+        """The wire form of a failure.
+
+        The structure sits at the top level rather than nested under ``error``,
+        and that is forced by the platform. Runpod's SDK pops a top-level
+        ``error`` out of whatever the handler returns (``rp_job.py``), moves it
+        to the job's own error field, and then drops ``output`` altogether when
+        the pop left it empty. The platform keeps that field only if it is a
+        string, so a structured error returned under ``error`` alone arrived as
+        a job with no output *and* no error: every code defined here was
+        invisible in production while passing every test locally.
+
+        ``error`` therefore carries a plain string, for Runpod's own reporting,
+        and everything a caller needs sits beside it where nothing removes it.
+        """
+        payload: dict[str, Any] = {
+            "error": f"{self.code}: {self.message}",
             "code": str(self.code),
             "message": self.message,
             "retryable": self.retryable,
         }
         if self.details:
-            error["details"] = self.details
-        return {"error": error}
+            payload["details"] = self.details
+        return payload
